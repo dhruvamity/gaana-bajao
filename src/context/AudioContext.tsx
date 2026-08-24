@@ -20,6 +20,11 @@ interface AudioContextType {
   isConnectOpen: boolean;
   /** Reads live analyser output. Call from your own animation frame. */
   getFrequencyData: () => Uint8Array;
+  /**
+   * Opt in to the spectrum analyser. Resolves false when it cannot be attached
+   * without silencing playback, in which case the visualiser must degrade.
+   */
+  enableAnalyser: () => Promise<boolean>;
   
   // Actions
   playTrack: (track: Track, newQueue?: Track[]) => void;
@@ -133,6 +138,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // write it straight to the DOM.
   const getFrequencyData = useCallback((): Uint8Array => {
     return audioEngineRef.current?.getFrequencyData() ?? EMPTY_FREQUENCY_DATA;
+  }, []);
+
+  // Attaching the analyser re-routes playback through Web Audio, which silences
+  // cross-origin media. It is therefore opt-in, requested only when a visualiser
+  // is actually on screen, and the engine verifies audio still reaches the
+  // output before keeping it.
+  const enableAnalyser = useCallback(async (): Promise<boolean> => {
+    return (await audioEngineRef.current?.enableAnalyser()) ?? false;
   }, []);
 
   // Broadcast state for Connect & Handoff sync.
@@ -357,6 +370,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isQueueOpen,
         isConnectOpen,
         getFrequencyData,
+        enableAnalyser,
         playTrack,
         togglePlay,
         pause,

@@ -44,6 +44,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
     isRepeat, 
     isNowPlayingOpen, 
     getFrequencyData,
+    enableAnalyser,
     togglePlay, 
     nextTrack, 
     prevTrack, 
@@ -176,7 +177,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
         {/* Tab Content Display */}
         <div className="w-full h-24 mt-4 flex items-center justify-center">
           {activeTab === 'visualizer' && (
-            <Visualizer getFrequencyData={getFrequencyData} isPlaying={isPlaying} />
+            <Visualizer getFrequencyData={getFrequencyData} enableAnalyser={enableAnalyser} isPlaying={isPlaying} />
           )}
 
           {activeTab === 'acoustics' && (
@@ -375,9 +376,22 @@ const VISUALIZER_BARS = 28;
  */
 const Visualizer: React.FC<{
   getFrequencyData: () => Uint8Array;
+  enableAnalyser: () => Promise<boolean>;
   isPlaying: boolean;
-}> = ({ getFrequencyData, isPlaying }) => {
+}> = ({ getFrequencyData, enableAnalyser, isPlaying }) => {
   const barsRef = useRef<Array<HTMLDivElement | null>>([]);
+  const [analyserLive, setAnalyserLive] = useState<boolean | null>(null);
+
+  // Request the analyser only while this component is mounted and playing.
+  // enableAnalyser resolves false when attaching it would silence the audio.
+  useEffect(() => {
+    if (!isPlaying) return;
+    let cancelled = false;
+    void enableAnalyser().then(ok => {
+      if (!cancelled) setAnalyserLive(ok);
+    });
+    return () => { cancelled = true; };
+  }, [isPlaying, enableAnalyser]);
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -385,7 +399,7 @@ const Visualizer: React.FC<{
   useEffect(() => {
     const bars = barsRef.current;
 
-    if (!isPlaying || prefersReducedMotion) {
+    if (!isPlaying || prefersReducedMotion || analyserLive !== true) {
       bars.forEach(bar => {
         if (bar) bar.style.height = '15%';
       });
@@ -406,18 +420,29 @@ const Visualizer: React.FC<{
     frame = requestAnimationFrame(tick);
 
     return () => cancelAnimationFrame(frame);
-  }, [isPlaying, getFrequencyData, prefersReducedMotion]);
+  }, [isPlaying, getFrequencyData, prefersReducedMotion, analyserLive]);
 
   return (
-    <div className="flex items-end justify-center gap-1 h-16 w-full px-8" aria-hidden="true">
-      {Array.from({ length: VISUALIZER_BARS }).map((_, i) => (
-        <div
-          key={i}
-          ref={el => { barsRef.current[i] = el; }}
-          className="flex-1 bg-gradient-to-t from-primary/40 to-primary rounded-full"
-          style={{ height: '15%' }}
-        />
-      ))}
+    <div className="w-full">
+      <div className="flex items-end justify-center gap-1 h-16 w-full px-8" aria-hidden="true">
+        {Array.from({ length: VISUALIZER_BARS }).map((_, i) => (
+          <div
+            key={i}
+            ref={el => { barsRef.current[i] = el; }}
+            className={`flex-1 rounded-full transition-colors ${
+              analyserLive === false
+                ? 'bg-white/10'
+                : 'bg-gradient-to-t from-primary/40 to-primary'
+            }`}
+            style={{ height: '15%' }}
+          />
+        ))}
+      </div>
+      {analyserLive === false && (
+        <p className="text-center text-[10px] text-on-surface-variant mt-2 px-6">
+          Spectrum view is unavailable for this source, so playback stays audible.
+        </p>
+      )}
     </div>
   );
 };

@@ -1,0 +1,122 @@
+rules_version = '2';
+
+// Gaana-Bajao Firestore security rules.
+//
+// Model: tracks and playlists form a shared catalogue that any signed-in user
+// can browse, but only the owner can modify. Everything that describes a
+// person — profile, listening history, active devices — is private to that
+// person and never readable by anyone else.
+//
+// Nothing is readable without authentication: the catalogue is user-uploaded
+// music and must not be dumpable by anyone who reads the project id out of the
+// client bundle.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Owner field must be present, must be the caller, and must never change.
+    function ownsNew() {
+      return isSignedIn() && request.resource.data.ownerId == uid();
+    }
+
+    function ownsExisting() {
+      return isSignedIn() && resource.data.ownerId == uid();
+    }
+
+    function ownerUnchanged() {
+      return request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    // ---------------------------------------------------------------- tracks
+    // Shared catalogue. Any signed-in user may read; only the uploader writes.
+    match /tracks/{trackId} {
+      function validTrack(data) {
+        return data.title is string
+            && data.title.size() > 0
+            && data.title.size() <= 300
+            && data.artist is string
+            && data.artist.size() <= 300
+            && data.audioUrl is string
+            && data.audioUrl.matches('https://.*')
+            && data.ownerId is string;
+      }
+
+      allow read: if isSignedIn();
+      allow create: if ownsNew() && validTrack(request.resource.data);
+      allow update: if ownsExisting()
+                    && ownerUnchanged()
+                    && validTrack(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    // ------------------------------------------------------------- playlists
+    // Shared for reading. The owner may do anything; listed collaborators may
+    // edit contents but cannot transfer ownership or change the collaborator
+    // set, and cannot delete the playlist.
+    match /playlists/{playlistId} {
+      function isCollaborator() {
+        return isSignedIn()
+            && resource.data.collaboratorIds is list
+            && uid() in resource.data.collaboratorIds;
+      }
+
+      function collaboratorsUnchanged() {
+        return request.resource.data.collaboratorIds == resource.data.collaboratorIds;
+      }
+
+      function validPlaylist(data) {
+        return data.title is string
+            && data.title.size() > 0
+            && data.title.size() <= 200
+            && data.trackIds is list
+            && data.trackIds.size() <= 5000
+            && data.ownerId is string;
+      }
+
+      allow read: if isSignedIn();
+      allow create: if ownsNew() && validPlaylist(request.resource.data);
+      allow update: if validPlaylist(request.resource.data)
+                    && ownerUnchanged()
+                    && (
+                         ownsExisting()
+                         || (isCollaborator() && collaboratorsUnchanged())
+                       );
+      allow delete: if ownsExisting();
+    }
+
+    // ----------------------------------------------------------------- users
+    // Strictly private. Previously the whole collection was fetched into the
+    // browser to populate a collaborator picker, exposing every user's email
+    // and listening history to every other user.
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && uid() == userId;
+
+      // Active playback devices, private to their owner.
+      match /devices/{deviceId} {
+        allow read, write: if isSignedIn() && uid() == userId;
+      }
+    }
+
+    // ------------------------------------------------------------- telemetry
+    // Append-only, and each user can only see their own events.
+    match /telemetry/{eventId} {
+      allow read: if isSignedIn() && resource.data.userId == uid();
+      allow create: if isSignedIn() && request.resource.data.userId == uid();
+      allow update, delete: if false;
+    }
+
+    // Anything not matched above is denied, including the legacy top-level
+    // device_sessions collection which leaked every user's devices.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -15,6 +15,14 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
+  /**
+   * Firebase uid of the uploader. The catalog is shared for reading, but only
+   * the uploader may modify or delete a track — security rules enforce this, so
+   * the field must be set at creation and can never be reassigned.
+   */
+  ownerId?: string;
+  /** Display name of the uploader, denormalised for attribution in the UI. */
+  ownerName?: string;
   artistId?: string;
   album: string;
   duration: number; // in seconds
@@ -55,6 +63,12 @@ export interface Playlist {
   ownerId: string;
   ownerName: string;
   collaborators?: { id: string; name: string; avatar: string }[];
+  /**
+   * Collaborator uids, kept alongside `collaborators` because security rules
+   * cannot project a field out of an array of maps. Must always be the set of
+   * `collaborators[].id`.
+   */
+  collaboratorIds?: string[];
   isAlgorithmic?: boolean;
   createdAt: number;
   updatedAt: number;

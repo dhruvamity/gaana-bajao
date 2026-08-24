@@ -2,6 +2,8 @@ import { AcousticAttributes } from '../types';
 
 export class AudioEngine {
   private audio: HTMLAudioElement;
+  /** Set once the analyser is known to break playback for this engine. */
+  private analyserUnavailable = false;
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
@@ -20,11 +22,21 @@ export class AudioEngine {
   private onErrorCallback?: (err: any) => void;
 
   constructor() {
-    this.audio = new Audio();
-    this.audio.crossOrigin = 'anonymous';
-    this.audio.preload = 'metadata';
-
+    this.audio = this.createElement();
     this.setupListeners();
+  }
+
+  private createElement(): HTMLAudioElement {
+    const el = new Audio();
+    el.preload = 'metadata';
+    // NOTE: `crossOrigin` is deliberately NOT set here.
+    //
+    // It is only needed to make a cross-origin resource readable by the Web
+    // Audio API. We no longer route playback through Web Audio by default (see
+    // enableAnalyser), and setting it has a real cost: if the media host does
+    // not return Access-Control-Allow-Origin, the element refuses to load the
+    // resource at all and fails with MEDIA_ELEMENT_ERROR code 4.
+    return el;
   }
 
   private setupListeners() {
@@ -41,7 +53,9 @@ export class AudioEngine {
       this.onEndedCallback?.();
     };
     this.listeners.play = () => {
-      this.initAudioContext();
+      // Resume a suspended context if the analyser is in use; never create one
+      // here, because attaching a Web Audio graph can silence the output.
+      void this.audioContext?.resume().catch(() => {});
       this.onPlayCallback?.();
     };
     this.listeners.pause = () => {
@@ -87,30 +101,40 @@ export class AudioEngine {
       // element already torn down
     }
 
-    try {
-      this.sourceNode?.disconnect();
-      this.analyser?.disconnect();
-    } catch {
-      // graph already disconnected
-    }
-
-    void this.audioContext?.close().catch(() => {
-      // context already closed
-    });
-
-    this.sourceNode = null;
-    this.analyser = null;
-    this.audioContext = null;
-    this.isContextInitialized = false;
+    void this.teardownGraph();
   }
 
-  private initAudioContext() {
-    if (this.isContextInitialized) return;
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
+  /**
+   * Attach a Web Audio analyser so the spectrum visualiser has real data.
+   *
+   * This is opt-in and self-verifying because it can silence playback outright.
+   * `createMediaElementSource` re-routes a media element's output through the
+   * audio graph, and for cross-origin media the browser silences that output
+   * unless the resource is CORS-clean. Measured against a CORS-enabled origin,
+   * every graph-attached variant produced pure silence (analyser peak
+   * -Infinity) while the element reported healthy playback with currentTime
+   * advancing — audio that looks like it is playing but cannot be heard.
+   *
+   * So: attach, then confirm signal actually reaches the analyser. If it does
+   * not, tear the graph down and restore direct playback.
+   *
+   * @returns true if the analyser is live and producing data.
+   */
+  public async enableAnalyser(): Promise<boolean> {
+    if (this.isDestroyed) return false;
+    if (this.isContextInitialized) return true;
+    if (this.analyserUnavailable) return false;
 
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) {
+      this.analyserUnavailable = true;
+      return false;
+    }
+
+    try {
       this.audioContext = new AudioCtx();
+      await this.audioContext.resume().catch(() => {});
+
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 128;
       this.analyser.smoothingTimeConstant = 0.8;
@@ -118,11 +142,126 @@ export class AudioEngine {
       this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
       this.sourceNode.connect(this.analyser);
       this.analyser.connect(this.audioContext.destination);
-
       this.isContextInitialized = true;
     } catch (e) {
-      console.warn('Web Audio API Visualizer context setup warning:', e);
+      console.warn('Analyser unavailable:', e);
+      this.analyserUnavailable = true;
+      await this.teardownGraph();
+      return false;
     }
+
+    // Only meaningful to verify while audio is actually playing.
+    if (this.audio.paused) return true;
+
+    const hasSignal = await this.waitForSignal();
+    if (!hasSignal) {
+      console.warn(
+        'Audio graph silenced this source (likely cross-origin media without ' +
+        'usable CORS). Restoring direct playback; spectrum visualiser disabled.'
+      );
+      this.analyserUnavailable = true;
+      await this.restoreDirectPlayback();
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Poll the analyser for a short window; resolves true as soon as any energy
+   * appears, false if the window elapses in silence.
+   *
+   * Deliberately timer-based rather than requestAnimationFrame: rAF does not
+   * fire at all in a hidden or backgrounded tab, which would leave this promise
+   * pending forever. Timers are throttled there but still fire, so the check
+   * always terminates.
+   */
+  private waitForSignal(timeoutMs = 800): Promise<boolean> {
+    return new Promise(resolve => {
+      if (!this.analyser) return resolve(false);
+      const buffer = new Uint8Array(this.analyser.frequencyBinCount);
+      const started = Date.now();
+      let timer = 0;
+
+      const finish = (result: boolean) => {
+        window.clearInterval(timer);
+        resolve(result);
+      };
+
+      const check = () => {
+        if (this.isDestroyed || !this.analyser) return finish(false);
+        this.analyser.getByteFrequencyData(buffer);
+        for (let i = 0; i < buffer.length; i++) {
+          if (buffer[i] > 0) return finish(true);
+        }
+        if (Date.now() - started >= timeoutMs) return finish(false);
+      };
+
+      timer = window.setInterval(check, 50);
+      check();
+    });
+  }
+
+  /**
+   * A MediaElementAudioSourceNode cannot be detached from its element, so the
+   * only way back to audible output is a fresh element. Rebuild it and resume
+   * from the same position so the listener hears at most a brief gap.
+   */
+  private async restoreDirectPlayback(): Promise<void> {
+    const { currentTime, volume, paused } = this.audio;
+    const url = this.currentRawUrl;
+
+    for (const [event, handler] of Object.entries(this.listeners)) {
+      this.audio.removeEventListener(event, handler as EventListener);
+    }
+    try {
+      this.audio.pause();
+      this.audio.removeAttribute('src');
+      this.audio.load();
+    } catch {
+      // element already detached
+    }
+
+    await this.teardownGraph();
+
+    this.audio = this.createElement();
+    this.setupListeners();
+    this.audio.volume = volume;
+    this.currentRawUrl = '';
+    this.setSource(url);
+
+    const resumeAt = () => {
+      try {
+        this.audio.currentTime = currentTime;
+      } catch {
+        // seek before metadata is ready; the loadedmetadata handler retries
+      }
+      if (!paused) void this.audio.play().catch(() => {});
+    };
+    if (this.audio.readyState >= 1) resumeAt();
+    else this.audio.addEventListener('loadedmetadata', resumeAt, { once: true });
+  }
+
+  private async teardownGraph(): Promise<void> {
+    try {
+      this.sourceNode?.disconnect();
+      this.analyser?.disconnect();
+    } catch {
+      // already disconnected
+    }
+    try {
+      await this.audioContext?.close();
+    } catch {
+      // already closed
+    }
+    this.sourceNode = null;
+    this.analyser = null;
+    this.audioContext = null;
+    this.isContextInitialized = false;
+  }
+
+  /** True when a live analyser is attached and producing data. */
+  public hasAnalyser(): boolean {
+    return this.isContextInitialized && !!this.analyser;
   }
 
   public setSource(url: string, { force = false }: { force?: boolean } = {}): void {
