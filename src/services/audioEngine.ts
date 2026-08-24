@@ -1,5 +1,4 @@
 import { AcousticAttributes } from '../types';
-import { StorageService } from './storageService';
 
 export class AudioEngine {
   private audio: HTMLAudioElement;
@@ -7,8 +6,11 @@ export class AudioEngine {
   private analyser: AnalyserNode | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
   private isContextInitialized = false;
+  private isDestroyed = false;
   private currentRawUrl: string = '';
-  private currentObjectUrl: string | null = null;
+
+  // Bound listener references, kept so destroy() can detach them
+  private readonly listeners: { [K in keyof HTMLMediaElementEventMap]?: EventListener } = {};
 
   // Listeners
   private onTimeUpdateCallback?: (currentTime: number, duration: number) => void;
@@ -26,30 +28,80 @@ export class AudioEngine {
   }
 
   private setupListeners() {
-    this.audio.addEventListener('timeupdate', () => {
-      if (this.onTimeUpdateCallback) {
-        this.onTimeUpdateCallback(this.audio.currentTime, this.audio.duration || 0);
-      }
-    });
-
-    this.audio.addEventListener('ended', () => {
-      if (this.onEndedCallback) {
-        this.onEndedCallback();
-      }
-    });
-
-    this.audio.addEventListener('play', () => {
+    this.listeners.timeupdate = () => {
+      this.onTimeUpdateCallback?.(this.audio.currentTime, this.audio.duration || 0);
+    };
+    this.listeners.durationchange = () => {
+      this.onTimeUpdateCallback?.(this.audio.currentTime, this.audio.duration || 0);
+    };
+    this.listeners.loadedmetadata = () => {
+      this.onTimeUpdateCallback?.(this.audio.currentTime, this.audio.duration || 0);
+    };
+    this.listeners.ended = () => {
+      this.onEndedCallback?.();
+    };
+    this.listeners.play = () => {
       this.initAudioContext();
-      if (this.onPlayCallback) this.onPlayCallback();
+      this.onPlayCallback?.();
+    };
+    this.listeners.pause = () => {
+      this.onPauseCallback?.();
+    };
+    this.listeners.error = () => {
+      this.onErrorCallback?.(this.audio.error);
+    };
+
+    for (const [event, handler] of Object.entries(this.listeners)) {
+      this.audio.addEventListener(event, handler as EventListener);
+    }
+  }
+
+  /**
+   * Fully release every resource this engine owns: media element listeners,
+   * the media element itself, the Web Audio graph and the AudioContext.
+   *
+   * Browsers cap a page at a small number of concurrent AudioContexts
+   * (6 in Chrome), so an engine that is discarded without close() being
+   * called permanently consumes one of those slots.
+   */
+  public destroy(): void {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+
+    // Detach callbacks first so teardown does not emit events into React
+    this.onTimeUpdateCallback = undefined;
+    this.onEndedCallback = undefined;
+    this.onPlayCallback = undefined;
+    this.onPauseCallback = undefined;
+    this.onErrorCallback = undefined;
+
+    for (const [event, handler] of Object.entries(this.listeners)) {
+      this.audio.removeEventListener(event, handler as EventListener);
+    }
+
+    try {
+      this.audio.pause();
+      this.audio.removeAttribute('src');
+      this.audio.load(); // aborts any in-flight network request
+    } catch {
+      // element already torn down
+    }
+
+    try {
+      this.sourceNode?.disconnect();
+      this.analyser?.disconnect();
+    } catch {
+      // graph already disconnected
+    }
+
+    void this.audioContext?.close().catch(() => {
+      // context already closed
     });
 
-    this.audio.addEventListener('pause', () => {
-      if (this.onPauseCallback) this.onPauseCallback();
-    });
-
-    this.audio.addEventListener('error', (e) => {
-      if (this.onErrorCallback) this.onErrorCallback(e);
-    });
+    this.sourceNode = null;
+    this.analyser = null;
+    this.audioContext = null;
+    this.isContextInitialized = false;
   }
 
   private initAudioContext() {
@@ -73,23 +125,20 @@ export class AudioEngine {
     }
   }
 
-  public async setSource(url: string) {
-    if (this.currentRawUrl === url) return;
+  public setSource(url: string, { force = false }: { force?: boolean } = {}): void {
+    if (!force && this.currentRawUrl === url) return;
     this.currentRawUrl = url;
-
-    // Clean up previous blob object URL if any
-    if (this.currentObjectUrl) {
-      URL.revokeObjectURL(this.currentObjectUrl);
-      this.currentObjectUrl = null;
-    }
-
-    let playableUrl = url;
-
-    this.audio.src = playableUrl;
+    this.audio.src = url;
     this.audio.load();
   }
 
+  /** URL currently loaded into the media element, or '' if none. */
+  public getSource(): string {
+    return this.currentRawUrl;
+  }
+
   public async play(): Promise<void> {
+    if (this.isDestroyed) return;
     if (this.audioContext && this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }

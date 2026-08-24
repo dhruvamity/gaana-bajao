@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronDown, 
   Heart, 
@@ -23,6 +23,7 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { Track } from '../types';
+import { CoverArt } from './CoverArt';
 
 interface NowPlayingModalProps {
   onSelectArtist?: (artistId: string) => void;
@@ -42,7 +43,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
     isShuffle, 
     isRepeat, 
     isNowPlayingOpen, 
-    frequencyData,
+    getFrequencyData,
     togglePlay, 
     nextTrack, 
     prevTrack, 
@@ -129,9 +130,12 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
       <main className="relative z-10 max-w-lg mx-auto w-full my-auto py-6 flex flex-col items-center">
         {/* Album Artwork Card */}
         <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden glass-elevated border border-white/15 p-2 shadow-2xl group">
-          <img
+          <CoverArt
             src={currentTrack.coverUrl}
-            alt={currentTrack.title}
+            title={currentTrack.title}
+            artist={currentTrack.artist}
+            id={currentTrack.id}
+            loading="eager"
             className={`w-full h-full object-cover rounded-2xl transition-transform duration-1000 ${isPlaying ? 'scale-105' : 'scale-100'}`}
           />
           {/* Subtle live acoustic badge */}
@@ -172,19 +176,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
         {/* Tab Content Display */}
         <div className="w-full h-24 mt-4 flex items-center justify-center">
           {activeTab === 'visualizer' && (
-            <div className="flex items-end justify-center gap-1 h-16 w-full px-8">
-              {Array.from({ length: 28 }).map((_, i) => {
-                const val = frequencyData[i * 2] || 15;
-                const heightPercent = Math.max(12, (val / 255) * 100);
-                return (
-                  <div
-                    key={i}
-                    className="flex-1 bg-gradient-to-t from-primary/40 to-primary rounded-full transition-all duration-75"
-                    style={{ height: isPlaying ? `${heightPercent}%` : '15%' }}
-                  />
-                );
-              })}
-            </div>
+            <Visualizer getFrequencyData={getFrequencyData} isPlaying={isPlaying} />
           )}
 
           {activeTab === 'acoustics' && (
@@ -367,6 +359,65 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           </button>
         </div>
       </footer>
+    </div>
+  );
+};
+
+const VISUALIZER_BARS = 28;
+
+/**
+ * Spectrum bars driven by their own animation frame.
+ *
+ * Bar heights are written straight to the DOM rather than held in React state:
+ * at 60fps a state update here re-rendered every consumer of the audio context
+ * across the whole app. The loop runs only while this component is mounted and
+ * audio is playing, and pauses itself when the tab is hidden.
+ */
+const Visualizer: React.FC<{
+  getFrequencyData: () => Uint8Array;
+  isPlaying: boolean;
+}> = ({ getFrequencyData, isPlaying }) => {
+  const barsRef = useRef<Array<HTMLDivElement | null>>([]);
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  useEffect(() => {
+    const bars = barsRef.current;
+
+    if (!isPlaying || prefersReducedMotion) {
+      bars.forEach(bar => {
+        if (bar) bar.style.height = '15%';
+      });
+      return;
+    }
+
+    let frame = 0;
+    const tick = () => {
+      const data = getFrequencyData();
+      for (let i = 0; i < bars.length; i++) {
+        const bar = bars[i];
+        if (!bar) continue;
+        const value = data[i * 2] || 15;
+        bar.style.height = `${Math.max(12, (value / 255) * 100)}%`;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frame);
+  }, [isPlaying, getFrequencyData, prefersReducedMotion]);
+
+  return (
+    <div className="flex items-end justify-center gap-1 h-16 w-full px-8" aria-hidden="true">
+      {Array.from({ length: VISUALIZER_BARS }).map((_, i) => (
+        <div
+          key={i}
+          ref={el => { barsRef.current[i] = el; }}
+          className="flex-1 bg-gradient-to-t from-primary/40 to-primary rounded-full"
+          style={{ height: '15%' }}
+        />
+      ))}
     </div>
   );
 };

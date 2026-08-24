@@ -18,7 +18,8 @@ interface AudioContextType {
   isNowPlayingOpen: boolean;
   isQueueOpen: boolean;
   isConnectOpen: boolean;
-  frequencyData: Uint8Array;
+  /** Reads live analyser output. Call from your own animation frame. */
+  getFrequencyData: () => Uint8Array;
   
   // Actions
   playTrack: (track: Track, newQueue?: Track[]) => void;
@@ -45,6 +46,12 @@ interface AudioContextType {
   logInteraction: (type: InteractionType, trackId?: string) => void;
 }
 
+/** How often a playing device republishes its position for Connect & Handoff. */
+const PLAYBACK_HEARTBEAT_MS = 15000;
+
+/** Shared zero-filled buffer returned when no analyser is available. */
+const EMPTY_FREQUENCY_DATA = new Uint8Array(32);
+
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -63,71 +70,102 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(false);
   const [isQueueOpen, setIsQueueOpen] = useState<boolean>(false);
   const [isConnectOpen, setIsConnectOpen] = useState<boolean>(false);
-  const [frequencyData, setFrequencyData] = useState<Uint8Array>(new Uint8Array(32));
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const playStartTimeRef = useRef<number>(0);
   const hasLogged30sRef = useRef<boolean>(false);
-  const animFrameRef = useRef<number | null>(null);
 
-  // Initialize engine once
+  // Media events fire asynchronously, long after render. Routing them through a
+  // ref lets the engine keep stable listeners for its whole lifetime while the
+  // handlers still observe current state — so the engine never has to be rebuilt
+  // (and torn down mid-playback) just to refresh a closure.
+  const mediaHandlersRef = useRef<{
+    onTimeUpdate: (currentTime: number, totalDuration: number) => void;
+    onEnded: () => void;
+    onPlay: () => void;
+    onPause: () => void;
+    onError: (err: unknown) => void;
+  }>({
+    onTimeUpdate: () => {},
+    onEnded: () => {},
+    onPlay: () => {},
+    onPause: () => {},
+    onError: () => {}
+  });
+
+  // Create the audio engine exactly once for the lifetime of the provider.
+  //
+  // This effect MUST NOT depend on any playback state. It previously depended on
+  // [currentTrack, duration]; because its cleanup pauses the engine, selecting a
+  // track paused the audio that had just been started and swapped the ref for a
+  // fresh engine with no source — so playback never survived a track change.
+  // The listeners registered here are stable delegates into mediaHandlersRef.
   useEffect(() => {
     const engine = new AudioEngine();
     audioEngineRef.current = engine;
 
     engine.setCallbacks({
-      onTimeUpdate: (currentTime, totalDuration) => {
-        setProgress(currentTime);
-        setDuration(totalDuration);
-
-        // Thesis 1: 30-Second Binarized Reward Engine
-        if (currentTime >= 30 && !hasLogged30sRef.current && currentTrack) {
-          hasLogged30sRef.current = true;
-          logInteractionInternal('stream_30s', currentTrack.id, currentTime);
-        }
-      },
-      onEnded: () => {
-        if (currentTrack) {
-          logInteractionInternal('stream_complete', currentTrack.id, duration);
-        }
-        handleTrackEnded();
-      },
-      onPlay: () => setIsPlaying(true),
-      onPause: () => setIsPlaying(false),
-      onError: (err) => console.warn('Audio playback error', err)
+      onTimeUpdate: (currentTime, totalDuration) =>
+        mediaHandlersRef.current.onTimeUpdate(currentTime, totalDuration),
+      onEnded: () => mediaHandlersRef.current.onEnded(),
+      onPlay: () => mediaHandlersRef.current.onPlay(),
+      onPause: () => mediaHandlersRef.current.onPause(),
+      onError: (err) => mediaHandlersRef.current.onError(err)
     });
 
     return () => {
-      engine.pause();
-    };
-  }, [currentTrack, duration]);
-
-  // Audio frequency visualizer animation loop
-  useEffect(() => {
-    const updateFrequency = () => {
-      if (audioEngineRef.current && isPlaying) {
-        const data = audioEngineRef.current.getFrequencyData();
-        setFrequencyData(new Uint8Array(data));
+      engine.destroy();
+      if (audioEngineRef.current === engine) {
+        audioEngineRef.current = null;
       }
-      animFrameRef.current = requestAnimationFrame(updateFrequency);
     };
+  }, []);
 
-    animFrameRef.current = requestAnimationFrame(updateFrequency);
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
-  }, [isPlaying]);
+  // Frequency data is deliberately NOT React state.
+  //
+  // It previously ran a requestAnimationFrame loop calling setState 60 times a
+  // second; because it lived on the context value, every consumer in the app
+  // re-rendered at 60fps — every track card, both sidebars, every mounted modal
+  // — to feed 28 bars inside a modal that is usually closed. The loop also
+  // rescheduled itself unconditionally, so it never stopped.
+  //
+  // Consumers now pull the data themselves from their own animation frame and
+  // write it straight to the DOM.
+  const getFrequencyData = useCallback((): Uint8Array => {
+    return audioEngineRef.current?.getFrequencyData() ?? EMPTY_FREQUENCY_DATA;
+  }, []);
 
-  // Broadcast state for Connect & Handoff sync
-  useEffect(() => {
+  // Broadcast state for Connect & Handoff sync.
+  //
+  // This must NOT depend on `progress`. It used to, and since progress updates
+  // on every `timeupdate` (~4Hz) that meant a Firestore write and a synchronous
+  // localStorage round trip four times a second — about 14,000 writes per hour
+  // of listening, against a 20,000/day free-tier quota.
+  //
+  // Instead: broadcast on real state transitions, plus a low-frequency
+  // heartbeat that reads the current position out of a ref.
+  const progressRef = useRef(0);
+  progressRef.current = progress;
+
+  const broadcastNow = useCallback(() => {
     ConnectSyncService.broadcastState({
       isPlaying,
       currentTrackId: currentTrack?.id,
-      progressSeconds: progress,
+      progressSeconds: progressRef.current,
       volume,
       isActivePlayback: isPlaying
     });
-  }, [isPlaying, currentTrack?.id, progress, volume]);
+  }, [isPlaying, currentTrack?.id, volume]);
+
+  useEffect(() => {
+    broadcastNow();
+  }, [broadcastNow]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = window.setInterval(broadcastNow, PLAYBACK_HEARTBEAT_MS);
+    return () => window.clearInterval(id);
+  }, [isPlaying, broadcastNow]);
 
   const logInteractionInternal = useCallback(async (
     action: InteractionType,
@@ -278,6 +316,32 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Refresh the media-event handlers after every render so the stable listeners
+  // registered on the engine always dispatch into current state.
+  useEffect(() => {
+    mediaHandlersRef.current = {
+      onTimeUpdate: (currentTime, totalDuration) => {
+        setProgress(currentTime);
+        setDuration(totalDuration);
+
+        // Thesis 1: 30-Second Binarized Reward Engine
+        if (currentTime >= 30 && !hasLogged30sRef.current && currentTrack) {
+          hasLogged30sRef.current = true;
+          logInteractionInternal('stream_30s', currentTrack.id, currentTime);
+        }
+      },
+      onEnded: () => {
+        if (currentTrack) {
+          logInteractionInternal('stream_complete', currentTrack.id, duration);
+        }
+        handleTrackEnded();
+      },
+      onPlay: () => setIsPlaying(true),
+      onPause: () => setIsPlaying(false),
+      onError: (err) => console.warn('Audio playback error', err)
+    };
+  });
+
   return (
     <AudioContext.Provider
       value={{
@@ -292,7 +356,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isNowPlayingOpen,
         isQueueOpen,
         isConnectOpen,
-        frequencyData,
+        getFrequencyData,
         playTrack,
         togglePlay,
         pause,
