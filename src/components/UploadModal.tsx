@@ -262,12 +262,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         // Upload audio to Cloudinary
         const finalAudioUrl = await StorageService.saveAudioBlob(trackId, item.file);
 
-        // Determine cover URL for this track:
-        // Priority: manual global cover > per-track ID3 embedded art > generated gradient
-        let trackCoverUrl = globalCoverUrl;
-        if (!trackCoverUrl && item.coverBlob) {
-          // Upload the embedded cover art to Cloudinary
+        // Cover priority: the track's OWN embedded artwork first, then a
+        // manually chosen cover as a fallback for tracks that have none.
+        //
+        // The manual cover used to win outright, which meant uploading an album
+        // replaced every song's real artwork with one image.
+        let trackCoverUrl = '';
+        if (item.coverBlob) {
           trackCoverUrl = await StorageService.saveImageBlob(`cover_${trackId}`, item.coverBlob);
+        }
+        if (!trackCoverUrl) {
+          trackCoverUrl = globalCoverUrl;
         }
         // No embedded artwork and no manual cover: leave this empty. The UI
         // generates a cover unique to the track, which keeps a library of
@@ -283,6 +288,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           title: item.title.trim() || 'Untitled Track',
           artist: item.artist.trim() || currentUser.name,
           artistId: slugifyArtistId(item.artist.trim() || currentUser.name),
+          ownerId: currentUser.id,
+          ownerName: currentUser.name,
           album: item.album.trim() || 'Single',
           duration: item.duration || 180,
           audioUrl: finalAudioUrl,
@@ -570,11 +577,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <div className="space-y-1 flex-1 min-w-0">
               <h4 className="text-xs font-bold text-white">Cover Artwork</h4>
               <p className="text-[11px] text-on-surface-variant">
-                {effectiveCover && !coverFile 
-                  ? 'Auto-extracted from ID3 tags. Upload to override.'
-                  : coverFile 
-                    ? 'Custom cover uploaded — applied to all tracks.'
-                    : 'No cover found. Upload one or tracks will use a default.'}
+                {coverFile
+                  ? 'Used only for tracks with no embedded artwork of their own.'
+                  : effectiveCover
+                    ? 'Auto-extracted from the file\u2019s ID3 tags.'
+                    : 'No embedded artwork found. Upload a cover, or one will be generated per track.'}
               </p>
               <label className="inline-block px-3 py-1 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors mt-1">
                 <span>Browse Cover Image</span>
