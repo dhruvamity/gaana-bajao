@@ -36,36 +36,6 @@ const STORAGE_KEYS = {
   FIREBASE_CONFIG: 'gaana_firebase_config'
 };
 
-const DUMMY_KEYWORDS = [
-  'kavinsky',
-  'aurora borealis',
-  'neon horizon',
-  'glacier',
-  'thesis 5',
-  'bart mix',
-  'daily flow',
-  'velocity radar',
-  'cyber focus'
-];
-
-export function isDummyTrack(t: Partial<Track>): boolean {
-  if (!t) return true;
-  const artistLower = (t.artist || '').toLowerCase();
-  const titleLower = (t.title || '').toLowerCase();
-  const url = (t.audioUrl || '').toLowerCase();
-  if (DUMMY_KEYWORDS.some(k => artistLower.includes(k) || titleLower.includes(k))) return true;
-  if (!url || url.includes('placeholder') || url.includes('example.com')) return true;
-  return false;
-}
-
-export function isDummyPlaylist(p: Partial<Playlist>): boolean {
-  if (!p) return true;
-  if (p.isAlgorithmic) return true;
-  const titleLower = (p.title || '').toLowerCase();
-  const ownerLower = (p.ownerName || '').toLowerCase();
-  if (DUMMY_KEYWORDS.some(k => titleLower.includes(k) || ownerLower.includes(k))) return true;
-  return false;
-}
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
@@ -114,8 +84,6 @@ export class DatabaseService {
    */
   public static async getTracks(): Promise<Track[]> {
     let local: Track[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
-    local = local.filter(t => !isDummyTrack(t));
-    localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(local));
 
     if (!db) return local;
 
@@ -123,20 +91,9 @@ export class DatabaseService {
       const snap = await getDocs(collection(db, 'tracks'));
       if (!snap.empty) {
         const remote: Track[] = [];
-        const toPurge: string[] = [];
-
         snap.docs.forEach(d => {
           const track = { id: d.id, ...d.data() } as Track;
-          if (isDummyTrack(track)) {
-            toPurge.push(d.id);
-          } else {
-            remote.push(track);
-          }
-        });
-
-        // Asynchronously purge dummy tracks from Firestore
-        toPurge.forEach(id => {
-          deleteDoc(doc(db!, 'tracks', id)).catch(() => {});
+          remote.push(track);
         });
 
         localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(remote));
@@ -153,8 +110,6 @@ export class DatabaseService {
    * Save a new track or update existing
    */
   public static async saveTrack(track: Track): Promise<void> {
-    if (isDummyTrack(track)) return;
-
     // 1. Instant local persistence
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
     const updated = [track, ...local.filter((t: Track) => t.id !== track.id)];
@@ -247,8 +202,6 @@ export class DatabaseService {
    */
   public static async getPlaylists(): Promise<Playlist[]> {
     let local: Playlist[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
-    local = local.filter(p => !isDummyPlaylist(p));
-    localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(local));
 
     if (!db) return local;
 
@@ -256,19 +209,9 @@ export class DatabaseService {
       const snap = await getDocs(collection(db, 'playlists'));
       if (!snap.empty) {
         const remote: Playlist[] = [];
-        const toPurge: string[] = [];
-
         snap.docs.forEach(d => {
           const playlist = { id: d.id, ...d.data() } as Playlist;
-          if (isDummyPlaylist(playlist)) {
-            toPurge.push(d.id);
-          } else {
-            remote.push(playlist);
-          }
-        });
-
-        toPurge.forEach(id => {
-          deleteDoc(doc(db!, 'playlists', id)).catch(() => {});
+          remote.push(playlist);
         });
 
         localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(remote));
@@ -285,8 +228,6 @@ export class DatabaseService {
    * Save or Update a Playlist
    */
   public static async savePlaylist(playlist: Playlist): Promise<void> {
-    if (isDummyPlaylist(playlist)) return;
-
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
     const updated = [playlist, ...local.filter((p: Playlist) => p.id !== playlist.id)];
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));

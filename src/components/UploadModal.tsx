@@ -2,25 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { 
   UploadCloud, 
   X, 
-  Sparkles, 
   Check, 
   Activity, 
-  Music, 
-  Image as ImageIcon, 
-  Clock, 
-  Zap, 
-  Flame, 
   FileAudio,
   FolderPlus,
-  ListPlus,
   Plus,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Disc3,
+  ImageIcon
 } from 'lucide-react';
 import { Track, AcousticAttributes, Playlist } from '../types';
 import { AudioEngine } from '../services/audioEngine';
 import { StorageService } from '../services/storageService';
 import { DatabaseService } from '../services/firebase';
+import { extractAudioMetadata, ExtractedMetadata } from '../services/metadataService';
 import { useAuth } from '../context/AuthContext';
 
 interface UploadModalProps {
@@ -36,21 +32,16 @@ interface QueuedTrack {
   title: string;
   artist: string;
   album: string;
+  genre: string;
   duration: number;
   acoustics: AcousticAttributes;
   isAnalyzing: boolean;
   status: 'idle' | 'uploading' | 'done' | 'error';
   errorMessage?: string;
+  // Per-track cover extracted from ID3
+  coverDataUrl: string | null;
+  coverBlob: Blob | null;
 }
-
-const DEFAULT_COVER_GRADIENTS = [
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80',
-];
 
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
@@ -61,10 +52,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const { currentUser } = useAuth();
 
   const [queue, setQueue] = useState<QueuedTrack[]>([]);
-  const [globalGenre, setGlobalGenre] = useState('Electronic');
-  const [globalTags, setGlobalTags] = useState('Chill, Focus');
+  const [globalGenre, setGlobalGenre] = useState('');
+  const [globalTags, setGlobalTags] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>(DEFAULT_COVER_GRADIENTS[0]);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>('');
 
   // Playlist Attachment Options
   const [playlistMode, setPlaylistMode] = useState<'none' | 'existing' | 'new'>('none');
@@ -95,7 +86,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   if (!isOpen || !currentUser) return null;
 
-  // Handle multi-file selection
+  // Handle multi-file selection — extract ID3 metadata + acoustic analysis
   const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -104,23 +95,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const rawName = file.name.replace(/\.[^/.]+$/, '');
-      let parsedArtist = currentUser.name || 'Artist';
-      let parsedTitle = rawName;
-
+      
+      // Filename-based fallback parsing (Artist - Title)
+      let fallbackArtist = currentUser.name || 'Unknown Artist';
+      let fallbackTitle = rawName;
       if (rawName.includes(' - ')) {
         const parts = rawName.split(' - ');
-        parsedArtist = parts[0].trim();
-        parsedTitle = parts.slice(1).join(' - ').trim();
+        fallbackArtist = parts[0].trim();
+        fallbackTitle = parts.slice(1).join(' - ').trim();
       }
 
       const tempId = `queue_${Date.now()}_${i}`;
       newItems.push({
         id: tempId,
         file,
-        title: parsedTitle,
-        artist: parsedArtist,
+        title: fallbackTitle,
+        artist: fallbackArtist,
         album: 'Single',
-        duration: 180,
+        genre: '',
+        duration: 0,
         acoustics: {
           tempo: 120,
           energy: 0.7,
@@ -130,30 +123,51 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           key: 'C Major'
         },
         isAnalyzing: true,
-        status: 'idle'
+        status: 'idle',
+        coverDataUrl: null,
+        coverBlob: null
       });
     }
 
     setQueue(prev => [...prev, ...newItems]);
 
-    // Analyze acoustics in background for each track
+    // Extract metadata and acoustics in parallel for each track
     for (const item of newItems) {
       try {
-        const analysis = await AudioEngine.getAudioDurationAndAcoustics(item.file);
+        // Run ID3 metadata extraction and acoustic analysis concurrently
+        const [metadata, analysis] = await Promise.all([
+          extractAudioMetadata(item.file),
+          AudioEngine.getAudioDurationAndAcoustics(item.file)
+        ]);
+
         setQueue(prev =>
-          prev.map(q =>
-            q.id === item.id
-              ? {
-                  ...q,
-                  duration: analysis.duration,
-                  acoustics: analysis.acoustics,
-                  isAnalyzing: false
-                }
-              : q
-          )
+          prev.map(q => {
+            if (q.id !== item.id) return q;
+
+            // ID3 metadata takes priority over filename-parsed values
+            const updatedTitle = metadata.title || q.title;
+            const updatedArtist = metadata.artist || q.artist;
+            const updatedAlbum = metadata.album || q.album;
+            const updatedGenre = metadata.genre || q.genre;
+            // Prefer metadata duration, fallback to acoustic analysis duration
+            const updatedDuration = metadata.duration || analysis.duration;
+
+            return {
+              ...q,
+              title: updatedTitle,
+              artist: updatedArtist,
+              album: updatedAlbum,
+              genre: updatedGenre,
+              duration: updatedDuration,
+              acoustics: analysis.acoustics,
+              coverDataUrl: metadata.coverDataUrl,
+              coverBlob: metadata.coverBlob,
+              isAnalyzing: false
+            };
+          })
         );
       } catch (err) {
-        console.warn('Acoustic analysis fallback for:', item.title, err);
+        console.warn('Analysis fallback for:', item.file.name, err);
         setQueue(prev =>
           prev.map(q => (q.id === item.id ? { ...q, isAnalyzing: false } : q))
         );
@@ -172,10 +186,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setQueue(prev => prev.filter(item => item.id !== id));
   };
 
-  const handleUpdateQueuedItem = (id: string, field: 'title' | 'artist' | 'album', value: string) => {
+  const handleUpdateQueuedItem = (id: string, field: 'title' | 'artist' | 'album' | 'genre', value: string) => {
     setQueue(prev =>
       prev.map(item => (item.id === id ? { ...item, [field]: value } : item))
     );
+  };
+
+  // Determine effective cover: manual upload > first track's embedded art > none
+  const getEffectiveCoverPreview = (): string => {
+    if (coverPreviewUrl) return coverPreviewUrl;
+    const firstWithCover = queue.find(q => q.coverDataUrl);
+    if (firstWithCover?.coverDataUrl) return firstWithCover.coverDataUrl;
+    return '';
   };
 
   // Submit and Upload All
@@ -190,10 +212,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setIsProcessingBatch(true);
       setError(null);
 
-      // 1. Upload Cover Art to Cloudinary (if provided)
-      let finalCoverUrl = coverPreviewUrl;
+      // 1. Upload global cover art to Cloudinary (if manually provided)
+      let globalCoverUrl = '';
       if (coverFile) {
-        finalCoverUrl = await StorageService.saveImageBlob(`cover_batch_${Date.now()}`, coverFile);
+        globalCoverUrl = await StorageService.saveImageBlob(`cover_batch_${Date.now()}`, coverFile);
       }
 
       const uploadedTracks: Track[] = [];
@@ -203,31 +225,48 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       for (let i = 0; i < queue.length; i++) {
         const item = queue[i];
         
-        // Update item status
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'uploading' } : q));
 
         const trackId = `track_${Date.now()}_${i}`;
+
+        // Upload audio to Cloudinary
         const finalAudioUrl = await StorageService.saveAudioBlob(trackId, item.file);
 
-        const artistKey = item.artist.toLowerCase().replace(/\s+/g, '-');
+        // Determine cover URL for this track:
+        // Priority: manual global cover > per-track ID3 embedded art > generated gradient
+        let trackCoverUrl = globalCoverUrl;
+        if (!trackCoverUrl && item.coverBlob) {
+          // Upload the embedded cover art to Cloudinary
+          trackCoverUrl = await StorageService.saveImageBlob(`cover_${trackId}`, item.coverBlob);
+        }
+        if (!trackCoverUrl) {
+          // Fallback: generate a color-based placeholder via Cloudinary text overlay
+          trackCoverUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80`;
+        }
+
+        const artistKey = item.artist.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        
+        // Use per-track genre if set, otherwise global, otherwise fallback
+        const trackGenre = item.genre || globalGenre || 'Music';
+
         const newTrack: Track = {
           id: trackId,
           title: item.title.trim() || 'Untitled Track',
           artist: item.artist.trim() || currentUser.name,
-          artistId: artistKey,
+          artistId: 'artist_' + artistKey,
           album: item.album.trim() || 'Single',
-          duration: item.duration,
+          duration: item.duration || 180,
           audioUrl: finalAudioUrl,
-          coverUrl: finalCoverUrl,
-          genre: globalGenre,
+          coverUrl: trackCoverUrl,
+          genre: trackGenre,
           tags: tagsArray,
           acoustics: item.acoustics,
           createdAt: Date.now(),
-          playCount: 1,
-          saveCount: 1,
+          playCount: 0,
+          saveCount: 0,
           skipCount: 0,
-          earlyVelocity: 8.0,
-          frictionScore: 12.0,
+          earlyVelocity: 0,
+          frictionScore: 0,
           recommendationReason: '🔥 Fresh Upload'
         };
 
@@ -247,11 +286,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           await DatabaseService.addTrackToPlaylist(selectedPlaylistId, trackId);
         }
       } else if (playlistMode === 'new' && newPlaylistTitle.trim()) {
+        // Use the first track's cover as playlist cover
+        const playlistCover = globalCoverUrl 
+          || uploadedTracks[0]?.coverUrl 
+          || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80';
+
         const newPlaylist: Playlist = {
           id: `pl_${Date.now()}`,
           title: newPlaylistTitle.trim(),
-          description: newPlaylistDescription.trim() || `Uploaded collection of ${uploadedTracks.length} tracks`,
-          coverUrl: finalCoverUrl,
+          description: newPlaylistDescription.trim() || `Collection of ${uploadedTracks.length} tracks`,
+          coverUrl: playlistCover,
           trackIds: uploadedTrackIds,
           ownerId: currentUser.id,
           ownerName: currentUser.name,
@@ -267,6 +311,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSuccessCount(uploadedTracks.length);
       setTimeout(() => {
         setQueue([]);
+        setCoverFile(null);
+        setCoverPreviewUrl('');
+        setGlobalGenre('');
+        setGlobalTags('');
+        setNewPlaylistTitle('');
+        setNewPlaylistDescription('');
+        setPlaylistMode('none');
+        setOverallProgress(0);
         setIsProcessingBatch(false);
         onClose();
       }, 1200);
@@ -277,6 +329,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setIsProcessingBatch(false);
     }
   };
+
+  const effectiveCover = getEffectiveCoverPreview();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-xl overflow-y-auto">
@@ -289,9 +343,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <UploadCloud size={22} />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white tracking-tight">Bulk Music Uploader</h2>
+              <h2 className="text-lg font-black text-white tracking-tight">Upload Music</h2>
               <p className="text-xs text-on-surface-variant">
-                Upload multiple songs to Cloudinary & auto-attach to playlists
+                ID3 metadata & cover art auto-extracted • Bulk upload supported
               </p>
             </div>
           </div>
@@ -306,7 +360,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmitBatch} className="p-6 space-y-6 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmitBatch} className="p-6 space-y-5 overflow-y-auto flex-1">
           
           {/* Error & Success Messages */}
           {error && (
@@ -323,7 +377,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           )}
 
-          {/* 1. Drag & Drop Multi-file Zone */}
+          {/* 1. Drop Zone */}
           <div className="relative border-2 border-dashed border-white/15 hover:border-primary/60 rounded-2xl p-6 text-center transition-all bg-surface-container-high/30 group cursor-pointer">
             <input
               type="file"
@@ -338,10 +392,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <FileAudio size={24} />
               </div>
               <div className="text-sm font-bold text-white">
-                Drop multiple audio files here, or <span className="text-primary underline">browse</span>
+                Drop audio files here, or <span className="text-primary underline">browse</span>
               </div>
               <div className="text-xs text-on-surface-variant">
-                Supports MP3, WAV, FLAC, M4A, OGG • Instant Web Audio Acoustic Analysis
+                MP3, WAV, FLAC, M4A, OGG — ID3 tags & album art auto-extracted
               </div>
             </div>
           </div>
@@ -354,7 +408,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   Queued Tracks ({queue.length})
                 </h3>
                 <span className="text-xs text-primary font-medium">
-                  {queue.filter(q => q.isAnalyzing).length > 0 ? 'Analyzing acoustics...' : 'Ready to upload'}
+                  {queue.filter(q => q.isAnalyzing).length > 0 ? 'Reading metadata...' : 'Ready to upload'}
                 </span>
               </div>
 
@@ -362,43 +416,66 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 {queue.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-xl bg-surface-container-high/70 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between"
+                    className="p-3 rounded-xl bg-surface-container-high/70 border border-white/5 flex items-center gap-3"
                   >
-                    <div className="flex items-center gap-3 min-w-0 flex-1 w-full sm:w-auto">
-                      <span className="text-xs font-bold text-on-surface-variant w-5">
-                        {idx + 1}.
-                      </span>
-                      <div className="space-y-1 flex-1 min-w-0">
+                    {/* Per-track cover thumbnail */}
+                    <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
+                      {item.coverDataUrl ? (
+                        <img src={item.coverDataUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-on-surface-variant">
+                          <Disc3 size={18} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <input
+                        type="text"
+                        value={item.title}
+                        disabled={isProcessingBatch}
+                        onChange={(e) => handleUpdateQueuedItem(item.id, 'title', e.target.value)}
+                        placeholder="Song Title"
+                        className="w-full text-xs font-bold text-white bg-transparent border-b border-transparent focus:border-primary/50 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-2 text-[11px] text-on-surface-variant">
                         <input
                           type="text"
-                          value={item.title}
+                          value={item.artist}
                           disabled={isProcessingBatch}
-                          onChange={(e) => handleUpdateQueuedItem(item.id, 'title', e.target.value)}
-                          placeholder="Song Title"
-                          className="w-full text-xs font-bold text-white bg-transparent border-b border-transparent focus:border-primary/50 focus:outline-none"
+                          onChange={(e) => handleUpdateQueuedItem(item.id, 'artist', e.target.value)}
+                          placeholder="Artist"
+                          className="text-[11px] text-on-surface-variant bg-transparent border-b border-transparent focus:border-primary/50 focus:outline-none max-w-[120px]"
                         />
-                        <div className="flex items-center gap-2 text-[11px] text-on-surface-variant">
-                          <input
-                            type="text"
-                            value={item.artist}
-                            disabled={isProcessingBatch}
-                            onChange={(e) => handleUpdateQueuedItem(item.id, 'artist', e.target.value)}
-                            placeholder="Artist Name"
-                            className="text-[11px] text-on-surface-variant bg-transparent border-b border-transparent focus:border-primary/50 focus:outline-none"
-                          />
-                          <span>•</span>
-                          <span>{Math.round(item.duration)}s</span>
-                          <span>•</span>
-                          <span className="text-primary">{item.acoustics.tempo} BPM</span>
-                        </div>
+                        <span>•</span>
+                        <input
+                          type="text"
+                          value={item.album}
+                          disabled={isProcessingBatch}
+                          onChange={(e) => handleUpdateQueuedItem(item.id, 'album', e.target.value)}
+                          placeholder="Album"
+                          className="text-[11px] text-on-surface-variant bg-transparent border-b border-transparent focus:border-primary/50 focus:outline-none max-w-[100px]"
+                        />
+                        {item.duration > 0 && (
+                          <>
+                            <span>•</span>
+                            <span>{Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, '0')}</span>
+                          </>
+                        )}
+                        {item.acoustics.tempo > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-primary">{item.acoustics.tempo} BPM</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {item.isAnalyzing ? (
                         <div className="flex items-center gap-1.5 text-[11px] text-amber-400">
                           <Activity size={13} className="animate-spin" />
-                          <span>Analyzing</span>
+                          <span>Reading</span>
                         </div>
                       ) : item.status === 'uploading' ? (
                         <div className="flex items-center gap-1.5 text-[11px] text-primary">
@@ -408,7 +485,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                       ) : item.status === 'done' ? (
                         <div className="flex items-center gap-1 text-[11px] text-emerald-400">
                           <Check size={14} />
-                          <span>Saved</span>
+                          <span>Done</span>
                         </div>
                       ) : (
                         <button
@@ -428,16 +505,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           )}
 
           {/* 3. Global Metadata & Artwork */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-on-surface-variant block mb-1.5">Genre</label>
+              <label className="text-xs font-bold text-on-surface-variant block mb-1.5">Global Genre Override</label>
               <input
                 type="text"
                 value={globalGenre}
                 disabled={isProcessingBatch}
                 onChange={(e) => setGlobalGenre(e.target.value)}
-                placeholder="e.g. Synthwave, Electronic, Lo-Fi"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                placeholder="Leave empty to use per-track ID3 genre"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary placeholder-on-surface-variant/50"
               />
             </div>
 
@@ -449,22 +526,28 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 disabled={isProcessingBatch}
                 onChange={(e) => setGlobalTags(e.target.value)}
                 placeholder="e.g. Focus, Chill, Late Night, Workout"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary placeholder-on-surface-variant/50"
               />
             </div>
           </div>
 
-          {/* Cover Art Upload */}
+          {/* Cover Art — shows extracted or manual */}
           <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-high/40 border border-white/5">
-            <img
-              src={coverPreviewUrl}
-              alt="Cover Preview"
-              className="w-16 h-16 rounded-xl object-cover border border-white/10 shadow-md flex-shrink-0"
-            />
+            <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 shadow-md flex-shrink-0 bg-white/5 flex items-center justify-center">
+              {effectiveCover ? (
+                <img src={effectiveCover} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <Disc3 size={24} className="text-on-surface-variant" />
+              )}
+            </div>
             <div className="space-y-1 flex-1 min-w-0">
-              <h4 className="text-xs font-bold text-white">Cover Artwork (Optional)</h4>
+              <h4 className="text-xs font-bold text-white">Cover Artwork</h4>
               <p className="text-[11px] text-on-surface-variant">
-                Applied to all uploaded tracks or new playlist
+                {effectiveCover && !coverFile 
+                  ? 'Auto-extracted from ID3 tags. Upload to override.'
+                  : coverFile 
+                    ? 'Custom cover uploaded — applied to all tracks.'
+                    : 'No cover found. Upload one or tracks will use a default.'}
               </p>
               <label className="inline-block px-3 py-1 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors mt-1">
                 <span>Browse Cover Image</span>
@@ -479,18 +562,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Playlist Direct Attachment Selection */}
+          {/* 4. Playlist Attachment */}
           <div className="space-y-3 p-4 rounded-2xl bg-surface-container-high/40 border border-white/5">
             <h3 className="text-xs font-bold uppercase text-on-surface-variant tracking-wider flex items-center gap-2">
               <FolderPlus size={15} className="text-primary" />
-              <span>Playlist Attachment Options</span>
+              <span>Playlist Attachment</span>
             </h3>
 
             <div className="grid grid-cols-3 gap-2 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setPlaylistMode('none')}
-                className={`py-2 px-3 rounded-xl border text-center transition-all ${
+                className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
                   playlistMode === 'none'
                     ? 'bg-primary text-black border-primary'
                     : 'bg-surface-container border-white/10 text-on-surface-variant hover:text-white'
@@ -502,7 +585,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPlaylistMode('existing')}
-                className={`py-2 px-3 rounded-xl border text-center transition-all ${
+                className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
                   playlistMode === 'existing'
                     ? 'bg-primary text-black border-primary'
                     : 'bg-surface-container border-white/10 text-on-surface-variant hover:text-white'
@@ -514,7 +597,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPlaylistMode('new')}
-                className={`py-2 px-3 rounded-xl border text-center transition-all ${
+                className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
                   playlistMode === 'new'
                     ? 'bg-primary text-black border-primary'
                     : 'bg-surface-container border-white/10 text-on-surface-variant hover:text-white'
@@ -524,9 +607,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </button>
             </div>
 
-            {/* Existing Playlist Dropdown */}
             {playlistMode === 'existing' && (
-              <div className="pt-2 animate-fade-in">
+              <div className="pt-2">
                 <label className="text-xs font-bold text-on-surface-variant block mb-1">
                   Choose Destination Playlist
                 </label>
@@ -550,9 +632,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </div>
             )}
 
-            {/* Create New Playlist Fields */}
             {playlistMode === 'new' && (
-              <div className="space-y-3 pt-2 animate-fade-in">
+              <div className="space-y-3 pt-2">
                 <div>
                   <label className="text-xs font-bold text-on-surface-variant block mb-1">
                     New Playlist Name
@@ -561,7 +642,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     type="text"
                     value={newPlaylistTitle}
                     onChange={(e) => setNewPlaylistTitle(e.target.value)}
-                    placeholder="e.g. Midnight Cyberpunk Sessions"
+                    placeholder="e.g. Road Trip Bangers"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
                     required={playlistMode === 'new'}
                   />
@@ -604,7 +685,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isProcessingBatch}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+              className="px-5 py-2.5 rounded-2xl text-xs font-bold text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -612,7 +693,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <button
               type="submit"
               disabled={isProcessingBatch || queue.length === 0}
-              className="px-6 py-2.5 rounded-2xl text-xs font-extrabold text-black bg-primary hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary/20 transition-all cursor-pointer hover:scale-102 active:scale-98"
+              className="px-6 py-2.5 rounded-2xl text-xs font-extrabold text-black bg-primary hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
             >
               {isProcessingBatch ? (
                 <>
