@@ -1,0 +1,265 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Glacier - Album Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-primary": "#0a4c6e",
+                        "on-primary": "#001f2e",
+                        "tertiary-fixed-dim": "#c8a0f0",
+                        "inverse-on-surface": "#0a0e1a",
+                        "on-surface-variant": "#a0b4c4",
+                        "secondary-fixed-dim": "#88b4cc",
+                        "on-secondary-fixed-variant": "#2a4a5e",
+                        "error": "#ff6b6b",
+                        "surface-dim": "#0f1524",
+                        "on-surface": "#e0e8f0",
+                        "surface-bright": "#1a2438",
+                        "inverse-surface": "#e0e8f0",
+                        "tertiary-container": "#3d2060",
+                        "primary": "#7dd3fc",
+                        "surface-container": "#141c2e",
+                        "on-primary-fixed-variant": "#004d73",
+                        "outline": "#4a6070",
+                        "on-secondary-fixed": "#0d1f2b",
+                        "on-tertiary-fixed-variant": "#4d2a73",
+                        "on-primary-container": "#c8eaff",
+                        "background": "#0a0e1a",
+                        "primary-fixed": "#c8eaff",
+                        "surface-container-low": "#111828",
+                        "on-background": "#e0e8f0",
+                        "primary-fixed-dim": "#7dd3fc",
+                        "surface-container-high": "#1a2438",
+                        "secondary": "#88b4cc",
+                        "on-tertiary": "#1a002e",
+                        "surface-container-lowest": "#0a0e1a",
+                        "primary-container": "#0e4d6e",
+                        "error-container": "#3d1414",
+                        "on-tertiary-fixed": "#1a002e",
+                        "surface-tint": "#7dd3fc",
+                        "on-primary-fixed": "#001f2e",
+                        "on-tertiary-container": "#e8d0ff",
+                        "surface": "#0f1524",
+                        "on-error": "#1a0000",
+                        "on-secondary": "#001f2e",
+                        "on-error-container": "#ffb3b3",
+                        "secondary-fixed": "#c0d8e8",
+                        "surface-container-highest": "#202c42",
+                        "tertiary-fixed": "#e8d0ff",
+                        "surface-variant": "#1a2438",
+                        "on-secondary-container": "#c0d8e8",
+                        "secondary-container": "#1a3a4e",
+                        "outline-variant": "#2a3a48",
+                        "tertiary": "#c8a0f0"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "display": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Custom scrollbar for web */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-container-highest');
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline-variant');
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen relative overflow-x-hidden" style="background: linear-gradient(rgb(10, 14, 26) 0%, rgb(15, 21, 36) 100%) fixed;">
+<!-- Ambient Background Glows -->
+<div class="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-primary/10 blur-[120px] rounded-full pointer-events-none -z-10 opacity-70"></div>
+<div class="fixed bottom-0 right-0 w-[500px] h-[400px] bg-tertiary/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/60 dark:bg-surface-dim/60 backdrop-blur-xl border-b border-primary/10 shadow-[0_0_30px_rgba(125,211,252,0.05)] font-display font-semibold tracking-tight">
+<div class="flex justify-between items-center px-6 py-4 w-full">
+<button class="text-on-surface-variant hover:bg-primary/10 transition-colors active:scale-95 duration-200 p-2 -ml-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="text-2xl font-display font-bold tracking-tighter text-on-surface dark:text-on-background bg-clip-text text-primary">Glacier</h1>
+<button class="text-on-surface-variant hover:bg-primary/10 transition-colors active:scale-95 duration-200 p-2 -mr-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">devices_fold</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="pt-28 pb-32 px-4 md:px-8 max-w-5xl mx-auto flex flex-col gap-10">
+<!-- Album Hero Section -->
+<section class="flex flex-col md:flex-row gap-8 items-start md:items-end">
+<!-- Cover Art Wrapper -->
+<div class="relative w-48 h-48 md:w-64 md:h-64 shrink-0 mx-auto md:mx-0 group">
+<!-- Glowing shadow behind -->
+<div class="absolute inset-0 bg-primary/20 blur-2xl rounded-xl scale-95 group-hover:scale-100 group-hover:bg-primary/30 transition-all duration-500"></div>
+<!-- Actual Image -->
+<img class="relative w-full h-full object-cover rounded-xl border border-primary/20 shadow-2xl z-10" data-alt="A mesmerizing and ethereal digital artwork of a fractured glacier glowing from within with a soft ice-blue and pale lavender light. The scene is set against a deep, dark navy-black abyss, representing cold isolation. The composition is highly polished, cinematic, and evokes a sense of pristine, frozen solitude, fitting perfectly as a modern ambient electronic music album cover." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHgzVctPdXXq3beJ0nw4UROl3lwJHMMPTcKJOx2dV9LyYkS5iJjilb1BSQSahtVcjyHgJs056RCWBlK6ILOODWKnV9IgOUH2QBF3BNbe8_LYXB8zWLxa_uvN6ydbT8k2kNl9UtSfgxEx-ddYLMHH-bpT9PgYyghfNqofqm3ZqVG-ckoKsarM3-8r3XpWS8L5ItUntsMI9DUhlRdRn_o9ROXZm4HsCXAt0vh_wpRNfGZVJsPLlLYDbN">
+</div>
+<!-- Album Metadata -->
+<div class="flex flex-col gap-3 flex-1 text-center md:text-left z-10">
+<div class="inline-flex items-center gap-2 justify-center md:justify-start text-xs font-medium tracking-widest uppercase text-tertiary-fixed-dim">
+<span class="material-symbols-outlined text-[16px]">album</span>
+                    LP Release
+                </div>
+<h2 class="text-4xl md:text-6xl font-display font-bold tracking-tight text-on-surface text-balance drop-shadow-md dark:text-on-background">Echoes of the Void</h2>
+<div class="flex items-center justify-center md:justify-start gap-2 mt-1">
+<div class="w-6 h-6 rounded-full bg-surface-container overflow-hidden border border-primary/20">
+<img class="w-full h-full object-cover" data-alt="A macro photograph of an abstract, dark frozen water droplet with intricate internal crystal structures catching subtle blue light highlights, creating a mysterious and sleek profile picture avatar for a minimalist electronic music artist." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfCWN6ECRn_dy2eW9Au4xRFpxjvbOnOnpba0NldRLfTxy5Lcn6mKmLs3YFqPKooezykh246ZEKY7YoDUlpno9jdFeazNVR3kIvCgNhmguKZD-g3_r42VoaW3aQp6HCnz3isJa_yPpWd3kFgSBkvmmHLk7_SfHMcaF3NWp2PeB12My0ymSpxHKfX1fAPWBLWgXgPCUOzXcATp8H14vRLhoBVQLyf_tm6BsiU6MTRz12zCAENRKSIs38">
+</div>
+<span class="text-lg font-medium text-on-surface">Kaelen</span>
+<span class="text-on-surface-variant px-1">•</span>
+<span class="text-sm text-on-surface-variant">2024</span>
+<span class="text-on-surface-variant px-1">•</span>
+<span class="text-sm text-on-surface-variant">9 Tracks, 42 min</span>
+</div>
+<!-- CTA Action Row -->
+<div class="mt-4 flex items-center justify-center md:justify-start gap-4">
+<button class="relative overflow-hidden group bg-primary/10 border border-primary/20 backdrop-blur-xl px-8 py-3.5 rounded-full flex items-center gap-2 text-primary font-medium transition-all duration-300 hover:bg-primary/20 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(125,211,252,0.15)] active:scale-95 bg-primary/20">
+<div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-primary/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+                        Add to Library
+                    </button>
+<button class="w-12 h-12 rounded-full border border-primary/10 bg-surface/40 backdrop-blur-md flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-dim hover:border-primary/30 transition-colors active:scale-95 border-primary/20">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Divider -->
+<div class="w-full h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent"></div>
+<!-- Tracklist Section -->
+<section class="flex flex-col">
+<!-- Header Row -->
+<div class="flex items-center px-4 py-2 text-xs font-medium text-on-surface-variant uppercase tracking-wider border-b border-primary/5 mb-2">
+<div class="w-8 text-center">#</div>
+<div class="flex-1">Title</div>
+<div class="w-16 text-right flex justify-end">
+<span class="material-symbols-outlined text-sm">schedule</span>
+</div>
+</div>
+<!-- Tracks -->
+<div class="flex flex-col gap-1">
+<!-- Track Item 1 -->
+<div class="group flex items-center px-4 py-3 rounded-lg border border-transparent hover:border-primary/10 hover:bg-surface/50 hover:backdrop-blur-xl transition-all cursor-pointer bg-surface/40">
+<div class="w-8 text-center text-sm text-on-surface-variant group-hover:hidden">1</div>
+<div class="w-8 text-center text-primary hidden group-hover:flex justify-center items-center">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<div class="flex-1 flex flex-col pl-2">
+<span class="text-sm font-medium text-on-surface group-hover:text-primary transition-colors">Fractal Frost</span>
+<span class="text-xs text-on-surface-variant">Kaelen</span>
+</div>
+<div class="w-16 flex items-center justify-end gap-3 text-sm text-on-surface-variant">
+<button class="opacity-0 group-hover:opacity-100 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined text-lg">favorite</span>
+</button>
+<span class="">4:12</span>
+</div>
+</div>
+<!-- Track Item 2 (Active/Playing State example) -->
+<div class="group flex items-center px-4 py-3 rounded-lg border border-primary/20 bg-primary/5 backdrop-blur-xl transition-all cursor-pointer shadow-[0_0_15px_rgba(125,211,252,0.05)]">
+<div class="w-8 text-center flex justify-center items-center">
+<span class="material-symbols-outlined text-xl text-primary animate-pulse">equalizer</span>
+</div>
+<div class="flex-1 flex flex-col pl-2">
+<span class="text-sm font-medium text-primary">Abyssal Currents</span>
+<span class="text-xs text-primary/70">Kaelen</span>
+</div>
+<div class="w-16 flex items-center justify-end gap-3 text-sm text-primary">
+<button class="opacity-100 hover:text-primary-fixed transition-all duration-200">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+<span class="">5:03</span>
+</div>
+</div>
+<!-- Track Item 3 -->
+<div class="group flex items-center px-4 py-3 rounded-lg border border-transparent hover:border-primary/10 hover:bg-surface/50 hover:backdrop-blur-xl transition-all cursor-pointer bg-surface/40">
+<div class="w-8 text-center text-sm text-on-surface-variant group-hover:hidden">3</div>
+<div class="w-8 text-center text-primary hidden group-hover:flex justify-center items-center">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<div class="flex-1 flex flex-col pl-2">
+<span class="text-sm font-medium text-on-surface group-hover:text-primary transition-colors">Subzero Resonance</span>
+<span class="text-xs text-on-surface-variant">Kaelen</span>
+</div>
+<div class="w-16 flex items-center justify-end gap-3 text-sm text-on-surface-variant">
+<button class="opacity-0 group-hover:opacity-100 hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined text-lg">favorite</span>
+</button>
+<span class="">3:48</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-surface-container-lowest/75 dark:bg-background/75 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-4px_24px_rgba(0,0,0,0.5)] flex justify-around items-center pt-3 pb-6 px-4 md:hidden">
+<!-- Home -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 duration-150 gap-1 w-16">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label text-xs font-medium">Home</span>
+</button>
+<!-- Search -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 duration-150 gap-1 w-16">
+<span class="material-symbols-outlined">search</span>
+<span class="font-label text-xs font-medium">Search</span>
+</button>
+<!-- Library (Active) -->
+<button class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim scale-110 transition-transform active:scale-90 duration-150 gap-1 w-16">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 1;">library_music</span>
+<span class="font-label text-xs font-bold">Library</span>
+</button>
+<!-- Premium -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 duration-150 gap-1 w-16">
+<span class="material-symbols-outlined">workspace_premium</span>
+<span class="font-label text-xs font-medium">Premium</span>
+</button>
+</nav>
+<!-- CSS Animation for Shimmer Effect -->
+<style>
+        @keyframes shimmer {
+            100% {
+                transform: translateX(100%);
+            }
+        }
+    </style>
+
+
+</body></html>

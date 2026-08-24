@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Glacier - Device Connect Menu</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config from Design System -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#0a4c6e",
+                        "on-primary": "#001f2e",
+                        "tertiary-fixed-dim": "#c8a0f0",
+                        "inverse-on-surface": "#0a0e1a",
+                        "on-surface-variant": "#a0b4c4",
+                        "secondary-fixed-dim": "#88b4cc",
+                        "on-secondary-fixed-variant": "#2a4a5e",
+                        "error": "#ff6b6b",
+                        "surface-dim": "#0f1524",
+                        "on-surface": "#e0e8f0",
+                        "surface-bright": "#1a2438",
+                        "inverse-surface": "#e0e8f0",
+                        "tertiary-container": "#3d2060",
+                        "primary": "#7dd3fc",
+                        "surface-container": "#141c2e",
+                        "on-primary-fixed-variant": "#004d73",
+                        "outline": "#4a6070",
+                        "on-secondary-fixed": "#0d1f2b",
+                        "on-tertiary-fixed-variant": "#4d2a73",
+                        "on-primary-container": "#c8eaff",
+                        "background": "#0a0e1a",
+                        "primary-fixed": "#c8eaff",
+                        "surface-container-low": "#111828",
+                        "on-background": "#e0e8f0",
+                        "primary-fixed-dim": "#7dd3fc",
+                        "surface-container-high": "#1a2438",
+                        "secondary": "#88b4cc",
+                        "on-tertiary": "#1a002e",
+                        "surface-container-lowest": "#0a0e1a",
+                        "primary-container": "#0e4d6e",
+                        "error-container": "#3d1414",
+                        "on-tertiary-fixed": "#1a002e",
+                        "surface-tint": "#7dd3fc",
+                        "on-primary-fixed": "#001f2e",
+                        "on-tertiary-container": "#e8d0ff",
+                        "surface": "#0f1524",
+                        "on-error": "#1a0000",
+                        "on-secondary": "#001f2e",
+                        "on-error-container": "#ffb3b3",
+                        "secondary-fixed": "#c0d8e8",
+                        "surface-container-highest": "#202c42",
+                        "tertiary-fixed": "#e8d0ff",
+                        "surface-variant": "#1a2438",
+                        "on-secondary-container": "#c0d8e8",
+                        "secondary-container": "#1a3a4e",
+                        "outline-variant": "#2a3a48",
+                        "tertiary": "#c8a0f0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "2xl": "2rem",
+                        "3xl": "2.5rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom Webkit Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(125, 211, 252, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(125, 211, 252, 0.4); }
+
+        /* Custom Range Slider Styling for Webkit */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #7dd3fc;
+            cursor: pointer;
+            margin-top: -6px; /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
+            box-shadow: 0 0 10px rgba(125, 211, 252, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(125, 211, 252, 0.2);
+            border-radius: 2px;
+        }
+        input[type=range]:focus::-webkit-slider-runnable-track {
+            background: rgba(125, 211, 252, 0.3);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body min-h-screen flex flex-col relative overflow-hidden antialiased selection:bg-primary/30 selection:text-primary">
+<!-- Atmospheric Background (simulating home screen content behind drawer) -->
+<div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+<div class="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-primary/20 rounded-full blur-[120px] mix-blend-screen opacity-50"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-tertiary-fixed-dim/20 rounded-full blur-[150px] mix-blend-screen opacity-40"></div>
+<!-- Placeholder Abstract Image to give the glass effect something to blur -->
+<div class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay" data-alt="A highly abstract, dark and moody macro photography shot of ice crystals forming on dark glass, illuminated by a faint, cool blue light. The composition is off-center, creating a mysterious, atmospheric, and premium technological aesthetic suitable for a high-end audio application background." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCoi_wIq5xUIpkHQhP25_WZRsx8RGvcC3BZd8uuyMwcYKhtbcPo9s7GaAlnQEDlLnh-rFEmY10AHo-WPzHNKFmbOaeLi9VGL0V1UOg1EYBZ6eaUT5DjvdWO200ZpPrVJrSUj39l9RnVNPeJSOwmeQwecqFrXq4ffzEXf609uCkKNCmrU6aO0lXicChlhKndF4rBOn-JGyOnFXjPsMYsIH0QreTkuVTLh33kihzbDpmGeUrjiVF6e0l7')"></div>
+</div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/60 dark:bg-surface-dim/60 backdrop-blur-xl border-b border-primary/10 shadow-[0_0_30px_rgba(125,211,252,0.05)] flex justify-between items-center px-6 py-4 transition-all">
+<button class="text-on-surface-variant hover:bg-primary/10 transition-colors p-2 -ml-2 rounded-full active:scale-95 duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+</button>
+<h1 class="text-2xl font-display font-bold tracking-tighter text-on-surface dark:text-on-background bg-clip-text">
+            Glacier
+        </h1>
+<button class="text-primary hover:bg-primary/10 transition-colors p-2 -mr-2 rounded-full active:scale-95 duration-200 flex items-center justify-center bg-primary/10 shadow-[0_0_15px_rgba(125,211,252,0.2)]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">devices_fold</span>
+</button>
+</header>
+<!-- Main Content Area (Hidden behind overlay) -->
+<main class="flex-grow pt-24 pb-32 px-6 z-10 relative">
+<div class="max-w-md mx-auto flex flex-col gap-8 opacity-40 blur-sm transition-all duration-500">
+<!-- Simulated Home Screen Content -->
+<div class="aspect-square w-full rounded-2xl bg-surface-container/50 border border-primary/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-6xl text-primary/30">album</span>
+</div>
+<div class="space-y-4">
+<div class="h-6 w-3/4 bg-surface-container rounded-full"></div>
+<div class="h-4 w-1/2 bg-surface-container rounded-full"></div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center pt-3 pb-6 px-4 bg-surface-container-lowest/75 dark:bg-background/75 backdrop-blur-2xl rounded-t-xl border-t border-primary/10 shadow-[0_-4px_24px_rgba(0,0,0,0.5)] z-[40]">
+<!-- Home (Active) -->
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim scale-110 transition-transform active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label text-xs font-bold">Home</span>
+</a>
+<!-- Search -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 transition-colors active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">search</span>
+<span class="font-label text-xs font-medium">Search</span>
+</a>
+<!-- Library -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 transition-colors active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">library_music</span>
+<span class="font-label text-xs font-medium">Library</span>
+</a>
+<!-- Premium -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 transition-colors active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">workspace_premium</span>
+<span class="font-label text-xs font-medium">Premium</span>
+</a>
+</nav>
+<!-- Overlay Backdrop -->
+<div class="fixed inset-0 bg-background/60 backdrop-blur-md z-[55] transition-opacity duration-300"></div>
+<!-- Device Handoff 'Connect' Drawer -->
+<div class="fixed bottom-0 left-0 w-full max-h-[751px] bg-[rgba(15,21,36,0.75)] backdrop-blur-2xl border-t border-primary/20 rounded-t-3xl z-[60] flex flex-col shadow-[0_-20px_60px_rgba(125,211,252,0.1)] transform transition-transform duration-500 translate-y-0 pb-safe">
+<!-- Drawer Handle -->
+<div class="w-full flex justify-center pt-4 pb-2 shrink-0">
+<div class="w-12 h-1.5 bg-on-surface-variant/30 rounded-full"></div>
+</div>
+<!-- Header -->
+<div class="px-6 pb-4 flex justify-between items-end border-b border-primary/5 shrink-0">
+<div>
+<h2 class="text-xl font-display font-semibold text-on-surface tracking-tight flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">devices</span>
+                    Connect to a device
+                </h2>
+<p class="text-sm text-on-surface-variant mt-1">Seamlessly transfer your audio.</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full bg-surface-container/30">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">close</span>
+</button>
+</div>
+<!-- Device List (Scrollable) -->
+<div class="p-6 overflow-y-auto flex flex-col gap-4 flex-grow">
+<!-- Section: Current Device -->
+<h3 class="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Current Device</h3>
+<div class="bg-[rgba(125,211,252,0.05)] border border-primary/20 rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden group">
+<!-- Active indicator glow -->
+<div class="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-50 pointer-events-none"></div>
+<div class="flex justify-between items-start relative z-10">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smartphone</span>
+</div>
+<div>
+<div class="font-semibold text-primary">This Phone</div>
+<div class="text-xs text-primary/70 flex items-center gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                Playing Now
+                            </div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 relative z-10 mt-2">
+<span class="material-symbols-outlined text-primary/70 text-sm">volume_down</span>
+<input class="w-full appearance-none bg-transparent" max="100" min="0" type="range" value="75"/>
+<span class="material-symbols-outlined text-primary/70 text-sm">volume_up</span>
+</div>
+</div>
+<!-- Section: Other Devices -->
+<h3 class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mt-4 mb-1">Available Devices</h3>
+<!-- Device: Living Room Speaker -->
+<div class="bg-surface-container-low/40 hover:bg-surface-container/60 border border-on-surface-variant/10 rounded-2xl p-5 flex flex-col gap-4 transition-all duration-200">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant border border-white/5">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">speaker</span>
+</div>
+<div>
+<div class="font-medium text-on-surface text-base">Living Room Speaker</div>
+<div class="text-xs text-on-surface-variant mt-0.5">Glacier Home Audio</div>
+</div>
+</div>
+<button class="px-4 py-2 rounded-full bg-surface border border-primary/20 text-primary text-sm font-medium hover:bg-primary/10 transition-colors active:scale-95">
+                        Transfer
+                    </button>
+</div>
+<!-- Pre-rendered volume slider (disabled/dimmed state for inactive device) -->
+<div class="flex items-center gap-4 opacity-40">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">volume_down</span>
+<input class="w-full appearance-none bg-transparent pointer-events-none" max="100" min="0" type="range" value="40"/>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">volume_up</span>
+</div>
+</div>
+<!-- Device: Desktop App -->
+<div class="bg-surface-container-low/40 hover:bg-surface-container/60 border border-on-surface-variant/10 rounded-2xl p-5 flex flex-col gap-4 transition-all duration-200">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant border border-white/5">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">desktop_windows</span>
+</div>
+<div>
+<div class="font-medium text-on-surface text-base">MacBook Pro</div>
+<div class="text-xs text-on-surface-variant mt-0.5">Desktop App</div>
+</div>
+</div>
+<button class="px-4 py-2 rounded-full bg-surface border border-primary/20 text-primary text-sm font-medium hover:bg-primary/10 transition-colors active:scale-95">
+                        Transfer
+                    </button>
+</div>
+<div class="flex items-center gap-4 opacity-40">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">volume_down</span>
+<input class="w-full appearance-none bg-transparent pointer-events-none" max="100" min="0" type="range" value="100"/>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">volume_up</span>
+</div>
+</div>
+<!-- Device: Car Audio -->
+<div class="bg-surface-container-low/40 hover:bg-surface-container/60 border border-on-surface-variant/10 rounded-2xl p-5 flex flex-col gap-4 transition-all duration-200">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant border border-white/5">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">directions_car</span>
+</div>
+<div>
+<div class="font-medium text-on-surface text-base">Model 3 Audio</div>
+<div class="text-xs text-on-surface-variant mt-0.5">Bluetooth Connected</div>
+</div>
+</div>
+<button class="px-4 py-2 rounded-full bg-surface border border-primary/20 text-primary text-sm font-medium hover:bg-primary/10 transition-colors active:scale-95">
+                        Transfer
+                    </button>
+</div>
+<div class="flex items-center gap-4 opacity-40">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">volume_down</span>
+<input class="w-full appearance-none bg-transparent pointer-events-none" max="100" min="0" type="range" value="65"/>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">volume_up</span>
+</div>
+</div>
+</div>
+</div>
+</body></html>

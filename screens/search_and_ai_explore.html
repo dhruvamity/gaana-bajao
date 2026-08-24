@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Glacier - Search &amp; Explore</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#0a4c6e",
+                    "on-primary": "#001f2e",
+                    "tertiary-fixed-dim": "#c8a0f0",
+                    "inverse-on-surface": "#0a0e1a",
+                    "on-surface-variant": "#a0b4c4",
+                    "secondary-fixed-dim": "#88b4cc",
+                    "on-secondary-fixed-variant": "#2a4a5e",
+                    "error": "#ff6b6b",
+                    "surface-dim": "#0f1524",
+                    "on-surface": "#e0e8f0",
+                    "surface-bright": "#1a2438",
+                    "inverse-surface": "#e0e8f0",
+                    "tertiary-container": "#3d2060",
+                    "primary": "#7dd3fc",
+                    "surface-container": "#141c2e",
+                    "on-primary-fixed-variant": "#004d73",
+                    "outline": "#4a6070",
+                    "on-secondary-fixed": "#0d1f2b",
+                    "on-tertiary-fixed-variant": "#4d2a73",
+                    "on-primary-container": "#c8eaff",
+                    "background": "#0a0e1a",
+                    "primary-fixed": "#c8eaff",
+                    "surface-container-low": "#111828",
+                    "on-background": "#e0e8f0",
+                    "primary-fixed-dim": "#7dd3fc",
+                    "surface-container-high": "#1a2438",
+                    "secondary": "#88b4cc",
+                    "on-tertiary": "#1a002e",
+                    "surface-container-lowest": "#0a0e1a",
+                    "primary-container": "#0e4d6e",
+                    "error-container": "#3d1414",
+                    "on-tertiary-fixed": "#1a002e",
+                    "surface-tint": "#7dd3fc",
+                    "on-primary-fixed": "#001f2e",
+                    "on-tertiary-container": "#e8d0ff",
+                    "surface": "#0f1524",
+                    "on-error": "#1a0000",
+                    "on-secondary": "#001f2e",
+                    "on-error-container": "#ffb3b3",
+                    "secondary-fixed": "#c0d8e8",
+                    "surface-container-highest": "#202c42",
+                    "tertiary-fixed": "#e8d0ff",
+                    "surface-variant": "#1a2438",
+                    "on-secondary-container": "#c0d8e8",
+                    "secondary-container": "#1a3a4e",
+                    "outline-variant": "#2a3a48",
+                    "tertiary": "#c8a0f0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.5rem",
+                    "lg": "1rem",
+                    "xl": "1.5rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "display": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0e1a;
+            color: #e0e8f0;
+        }
+        
+        .glass-panel {
+            background: rgba(15, 21, 36, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(125, 211, 252, 0.1);
+        }
+        
+        .glass-elevated {
+            background: rgba(15, 21, 36, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(125, 211, 252, 0.15);
+        }
+        
+        .glow-effect {
+            box-shadow: 0 0 30px rgba(125, 211, 252, 0.05);
+        }
+        
+        .glow-focus:focus-within {
+            box-shadow: 0 0 40px rgba(125, 211, 252, 0.1);
+            border-color: rgba(125, 211, 252, 0.3);
+        }
+        
+        .aura-pulse {
+            animation: pulse-aura 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes pulse-aura {
+            0% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.4); }
+            70% { box-shadow: 0 0 0 20px rgba(125, 211, 252, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background min-h-screen text-on-surface overflow-x-hidden pt-20 pb-24 md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/60 dark:bg-surface-dim/60 backdrop-blur-xl border-b border-primary/10 shadow-[0_0_30px_rgba(125,211,252,0.05)]">
+<div class="flex justify-between items-center px-6 py-4 w-full">
+<button class="text-on-surface-variant hover:bg-primary/10 transition-colors active:scale-95 duration-200 p-2 rounded-full">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="text-2xl font-display font-bold tracking-tighter text-on-surface dark:text-on-background bg-clip-text">
+                Glacier
+            </div>
+<button class="text-on-surface-variant hover:bg-primary/10 transition-colors active:scale-95 duration-200 p-2 rounded-full hidden md:block">
+<span class="material-symbols-outlined">devices_fold</span>
+</button>
+<!-- Web Nav Cluster (Hidden on Mobile) -->
+<nav class="hidden md:flex gap-6 items-center absolute left-1/2 transform -translate-x-1/2">
+<a class="text-on-surface-variant hover:bg-primary/10 transition-colors px-4 py-2 rounded-lg font-label font-medium text-sm" href="#">Home</a>
+<a class="text-primary bg-primary/10 px-4 py-2 rounded-lg font-label font-medium text-sm" href="#">Search</a>
+<a class="text-on-surface-variant hover:bg-primary/10 transition-colors px-4 py-2 rounded-lg font-label font-medium text-sm" href="#">Library</a>
+<a class="text-on-surface-variant hover:bg-primary/10 transition-colors px-4 py-2 rounded-lg font-label font-medium text-sm" href="#">Premium</a>
+</nav>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+<!-- Search Section -->
+<section class="mt-8">
+<div class="max-w-3xl mx-auto text-center mb-8">
+<h1 class="text-4xl md:text-5xl font-display font-bold tracking-tight mb-4 bg-gradient-to-r from-on-surface to-on-surface-variant bg-clip-text text-transparent">
+                    Discover Your Next Obsession
+                </h1>
+<p class="text-on-surface-variant text-lg">Search for a mood, vibe, artist, or let AI guide you.</p>
+</div>
+<div class="max-w-4xl mx-auto relative group">
+<div class="absolute inset-0 bg-primary/5 rounded-2xl blur-xl transition-all duration-500 group-hover:bg-primary/10"></div>
+<div class="glass-elevated glow-focus rounded-2xl flex items-center p-2 relative z-10 transition-all duration-300">
+<span class="material-symbols-outlined text-on-surface-variant pl-4">search</span>
+<input class="w-full bg-transparent border-none text-on-surface placeholder-on-surface-variant/50 focus:ring-0 text-lg px-4 font-body" placeholder="Search for 'Rainy Commute', 'Upbeat Focus'..." type="text"/>
+<button class="bg-primary/20 hover:bg-primary/30 text-primary p-3 rounded-xl transition-colors aura-pulse flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Bento Grid Categories -->
+<section>
+<h2 class="text-2xl font-headline font-semibold mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">explore</span>
+                Explore Categories
+            </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Card 1 -->
+<div class="glass-panel rounded-xl overflow-hidden group cursor-pointer hover:bg-surface-variant/40 transition-all duration-300">
+<div class="h-32 bg-cover bg-center relative" data-alt="A moody, cinematic photograph of a rainy city street at night seen through a rain-streaked car window. The glowing red taillights and neon signs reflect on the wet pavement, creating a melancholic yet comforting atmosphere. Ice-blue and deep navy tones dominate the palette, fitting the Glacier app's dark mode aesthetic. High contrast, atmospheric depth." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCkWqLcf7SeSDTKi7vy-KZgcr2vLl1SqzZV-vwNOfQWERTG737k_cKdRV52uJ35o5PIA2cimuAI_n2oEkp2b3v86G30jlAQiFPz0KE5hjez8a-bS6hR1kfBI0_VxNnsL-SOd_uW2j3Y9BCCG20d8SwqX00NGK_oXe4halLtZCpTTH7prmVXh_sOGSOlQM20cJfEDD3zfEax28WphgdC6ImhjOSk0qvEsMM7zA20NSMiHx7BbdXqULEa')">
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<h3 class="font-headline font-bold text-lg">Rainy Commute</h3>
+<p class="text-on-surface-variant text-sm">Lo-fi &amp; Ambient</p>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="glass-panel rounded-xl overflow-hidden group cursor-pointer hover:bg-surface-variant/40 transition-all duration-300 lg:col-span-2">
+<div class="h-32 bg-cover bg-center relative" data-alt="A vibrant, energetic abstract 3D render of pulsing sound waves and geometric shapes exploding in a dynamic composition. The colors are predominantly bright ice-blue and soft lavender against a deep black void. The lighting is neon and high-energy, perfectly capturing the vibe of 'Upbeat Focus' music within a premium glassmorphic UI environment." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAoWgBk4ojN8x58z735e-mpR-KiJs63vX4toQ-yvYJ76RKX15nZV3raFH_s6xcFYLodwmLjN8Dvl87unTh-vI8Z5b3BZ68ZH_pEBeLEnXSHCb8x3ur-uZ_Fpa3RpCLZL-zT7ix1msnJMjsY4MNw82BWb-lkSXI8IXCU1j-JNTroS0pL1ika5M2B-puG3Ge5XFK_D-yU6U-byb_WLVX9-5g6kBXBHsCUM1FHcpxGJaKRvj0y-7LyYbQr')">
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<h3 class="font-headline font-bold text-xl">Upbeat Focus</h3>
+<p class="text-on-surface-variant text-sm">Electronic &amp; Synthwave</p>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="glass-panel rounded-xl overflow-hidden group cursor-pointer hover:bg-surface-variant/40 transition-all duration-300">
+<div class="h-32 bg-cover bg-center relative" data-alt="A serene, ethereal landscape of a snow-covered mountain peak at twilight, bathed in soft moonlight. The scene is minimal and majestic, with deep shadows and soft highlights in tones of navy and icy blue. It conveys a sense of profound calm and deep sleep, aligning with the premium, dark-mode aesthetic of the Glacier app." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAZBeH9BNdoMUn44FYRwsGNiA4mLPQaYDqdbDQsF9e6MNhWabptudGYClVfMJ_ucSB6nzgjbFdBGvVqcxuL3_JG6UjzR9E0iGhoSgJLnOLXYev64smfUZrKthGnj8xXlUzyW6gnoVT8YwVoa2RLxemjlj_kwrzrIy2AJHB01LoB8x4Gkm6vRphgfIw7quj2mDQi-fSROGtBscsNbDxaQTUdCG0fT0_ihwjPZxkzJWJcL4Bb-WGKyc0o')">
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<h3 class="font-headline font-bold text-lg">Deep Sleep</h3>
+<p class="text-on-surface-variant text-sm">Binaural &amp; Drone</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center pt-3 pb-6 px-4 bg-surface-container-lowest/75 dark:bg-background/75 backdrop-blur-2xl rounded-t-xl border-t border-primary/10 shadow-[0_-4px_24px_rgba(0,0,0,0.5)] z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary/80 transition-colors">home</span>
+<span class="font-label text-[10px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim scale-110 transition-transform active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="font-label text-[10px] font-medium">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary/80 transition-colors">library_music</span>
+<span class="font-label text-[10px] font-medium">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary/80 active:scale-90 duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary/80 transition-colors">workspace_premium</span>
+<span class="font-label text-[10px] font-medium">Premium</span>
+</a>
+</nav>
+</body></html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Glacier - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#0a4c6e",
+                    "on-primary": "#001f2e",
+                    "tertiary-fixed-dim": "#c8a0f0",
+                    "inverse-on-surface": "#0a0e1a",
+                    "on-surface-variant": "#94a3b8",
+                    "secondary-fixed-dim": "#88b4cc",
+                    "on-secondary-fixed-variant": "#2a4a5e",
+                    "error": "#ff6b6b",
+                    "surface-dim": "#0f1524",
+                    "on-surface": "#ffffff",
+                    "surface-bright": "#1a2438",
+                    "inverse-surface": "#e0e8f0",
+                    "tertiary-container": "#3d2060",
+                    "primary": "#7dd3fc",
+                    "surface-container": "#141c2e",
+                    "on-primary-fixed-variant": "#004d73",
+                    "outline": "#4a6070",
+                    "on-secondary-fixed": "#0d1f2b",
+                    "on-tertiary-fixed-variant": "#4d2a73",
+                    "on-primary-container": "#c8eaff",
+                    "background": "#020617",
+                    "primary-fixed": "#c8eaff",
+                    "surface-container-low": "#111828",
+                    "on-background": "#ffffff",
+                    "primary-fixed-dim": "#7dd3fc",
+                    "surface-container-high": "#1a2438",
+                    "secondary": "#88b4cc",
+                    "on-tertiary": "#1a002e",
+                    "surface-container-lowest": "#0a0e1a",
+                    "primary-container": "#0e4d6e",
+                    "error-container": "#3d1414",
+                    "on-tertiary-fixed": "#1a002e",
+                    "surface-tint": "#7dd3fc",
+                    "on-primary-fixed": "#001f2e",
+                    "on-tertiary-container": "#e8d0ff",
+                    "surface": "#0f1524",
+                    "on-error": "#1a0000",
+                    "on-secondary": "#001f2e",
+                    "on-error-container": "#ffb3b3",
+                    "secondary-fixed": "#c0d8e8",
+                    "surface-container-highest": "#202c42",
+                    "tertiary-fixed": "#e8d0ff",
+                    "surface-variant": "#1a2438",
+                    "on-secondary-container": "#c0d8e8",
+                    "secondary-container": "#1a3a4e",
+                    "outline-variant": "#2a3a48",
+                    "tertiary": "#c8a0f0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.5rem",
+                    "lg": "1rem",
+                    "xl": "1.5rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "display": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { 
+            background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+            color: theme('colors.on-background'); 
+            overflow-x: hidden; 
+            min-height: max(884px, 100dvh);
+            background-attachment: fixed;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        .glass-elevated {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            border: 1px solid rgba(125, 211, 252, 0.15);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glow-effect:hover { box-shadow: 0 0 30px rgba(125, 211, 252, 0.1); }
+    </style>
+</head>
+<body class="font-body antialiased pb-40">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#020617]/50 backdrop-blur-2xl border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex justify-between items-center px-6 py-4 w-full">
+<button class="text-on-surface-variant hover:bg-white/5 transition-colors rounded-full p-2 active:scale-95 duration-200">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" data-icon="menu">menu</span>
+</button>
+<h1 class="font-display font-semibold tracking-tight text-2xl text-white">Glacier</h1>
+<button class="text-on-surface-variant hover:bg-white/5 transition-colors rounded-full p-2 active:scale-95 duration-200">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" data-icon="devices_fold">devices_fold</span>
+</button>
+</div>
+</header>
+<main class="pt-24 px-6 max-w-7xl mx-auto">
+<!-- Greeting -->
+<section class="mb-10">
+<h2 class="text-4xl font-headline font-bold tracking-tight text-white mb-2">Good evening, User</h2>
+<p class="text-on-surface-variant text-lg font-medium">Your sonic landscape awaits.</p>
+</section>
+<!-- Jump Back In -->
+<section class="mb-12">
+<h3 class="text-2xl font-headline font-semibold mb-6 flex items-center gap-3 text-white">
+<span class="material-symbols-outlined text-primary" data-icon="history">history</span>
+                Jump Back In
+            </h3>
+<div class="flex overflow-x-auto hide-scrollbar gap-6 pb-4 -mx-6 px-6 snap-x snap-mandatory">
+<!-- Card 1 -->
+<div class="flex-none w-64 snap-center group">
+<div class="glass-panel rounded-2xl overflow-hidden aspect-square relative mb-4 group-hover:-translate-y-1 transition-all duration-300">
+<img class="object-cover w-full h-full opacity-90 group-hover:opacity-100 transition-opacity mix-blend-screen" data-alt="Abstract atmospheric deep space nebula in vibrant cyan and magenta tones, highly detailed, ethereal lighting, dark background, cinematic composition, fluid forms." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgF9m1NXOIAbdyBZfaC_BsCASPN9I5-A5urGIhO_iBOuZOwYEIiRg1CzInMebwvlEfJFJoPZ8HWGpxF4MDvjwO8ZFy8Yg1Vdcc_JDveFa5N_CZ6LDpSWeYDf2fojEG2Slo90TUm-GML1mGBa2VRj8cBzTrLukHe7lZ-yEWDxw0J9tBqXMoCJVe21IxDPSaOrrsaTKhzuotHvKE7yd8kNwWepHpOX1jzMbfMJS7aGv6d3Q-Uu780v-d"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<button class="absolute bottom-4 right-4 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 hover:bg-primary hover:border-primary hover:text-[#020617]">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<h4 class="font-semibold text-white truncate text-lg">Stellar Echoes</h4>
+<p class="text-sm text-on-surface-variant truncate">Ambient Mix</p>
+</div>
+<!-- Card 2 -->
+<div class="flex-none w-64 snap-center group">
+<div class="glass-panel rounded-2xl overflow-hidden aspect-square relative mb-4 group-hover:-translate-y-1 transition-all duration-300">
+<img class="object-cover w-full h-full opacity-90 group-hover:opacity-100 transition-opacity mix-blend-screen" data-alt="Minimalist glowing geometric spheres suspended in a dark icy cavern, soft blue bioluminescence, sharp reflections, high contrast, surreal landscape." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2jY1q8X1BRGPLVw4AFo3KIUDzzWTm-o91c1Nk3Idz1NHOA2UdfLhnuIluUOvoJKnybWFuSfN0Nmm-a5Oh_sjRuHiAEWLoBc9-Wh77pgnZuaFUjypsc2hfs287V-b919FPbDxSUIa2iWnSKsHfFMygordvuJE1CxpaVRVS6mdMovxomNoijONLnpgtHXbeEk35tu0RjeynT3KzALDPZ-C4-16AkzMRyzLNlV3rVBCbgR3GMr74Kc-q"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<button class="absolute bottom-4 right-4 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 hover:bg-primary hover:border-primary hover:text-[#020617]">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<h4 class="font-semibold text-white truncate text-lg">Subzero Frequencies</h4>
+<p class="text-sm text-on-surface-variant truncate">Electronic</p>
+</div>
+<!-- Card 3 -->
+<div class="flex-none w-64 snap-center group">
+<div class="glass-panel rounded-2xl overflow-hidden aspect-square relative mb-4 group-hover:-translate-y-1 transition-all duration-300">
+<img class="object-cover w-full h-full opacity-90 group-hover:opacity-100 transition-opacity mix-blend-screen" data-alt="Dark moody forest at night with neon blue rain, cinematic lighting, cyberpunk nature aesthetic, deeply saturated colors, mystical atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-e4oBqSW7qS8rfj_-38cI2cj8oWTdN34jO7982YLKVMzx-C8_JHt1ZByKoKfN9fhNA7ZQv8r8Az4j9G1NLeAp7_vVQtA5Go9oZZPEp4mAizVl6-oJlMFa5RSlETHJBQBfc3YT62_JO3DVA0tq38pDTyDszMHarzUPPXPSOeAJ27hKlYrUQbDgfBZgTbQiR5EPNZ0pMDm2gJE42Ij4SWTCzUd-n6eOgVw6Z59ooGdYv85ZZ__D79sm"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<button class="absolute bottom-4 right-4 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 hover:bg-primary hover:border-primary hover:text-[#020617]">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<h4 class="font-semibold text-white truncate text-lg">Midnight Rain</h4>
+<p class="text-sm text-on-surface-variant truncate">Lo-Fi Focus</p>
+</div>
+</div>
+</section>
+<!-- Discover Weekly (Bento Style) -->
+<section class="mb-12">
+<h3 class="text-2xl font-headline font-semibold mb-6 flex items-center gap-3 text-white">
+<span class="material-symbols-outlined text-primary" data-icon="explore">explore</span>
+                Discover Weekly
+            </h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Large Feature -->
+<div class="md:col-span-2 glass-panel rounded-3xl p-8 relative overflow-hidden group min-h-[360px] flex flex-col justify-end">
+<div class="absolute inset-0 z-0 bg-[#020617]">
+<img class="object-cover w-full h-full opacity-50 group-hover:opacity-70 transition-opacity duration-700 mix-blend-screen" data-alt="Vast futuristic metropolis skyline seen through rain-streaked glass, dark moody blues and cyan neon lights, cinematic depth of field, high-tech dystopian vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnekI61OEOXcQcXDdrnt62wAH8LWj7W3N8KoSJhL_tJHCgFtsGr_i100FYcYwbO6Tj5QLVI4j2-5DPToSWZaRXWYGEafKxQrmH5YrqRh9qg7cvgzkV_ErnSZq39W0BC-q4CaaujpNxCrmbw1VZea3F8VrZw-SoMRz6DOulKZTLjT7jE4F4Y-uEcOOjtFdnT0MqRNVuTxFh9zlUmXQ3ljc9UzedFIblDaCenVQZevZZTpCEjdz9y0gb"/>
+<div class="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/80 to-transparent"></div>
+</div>
+<div class="relative z-10">
+<span class="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-bold tracking-wider rounded-full border border-primary/20 mb-4 backdrop-blur-md uppercase">Top Pick</span>
+<h4 class="text-4xl font-bold text-white mb-3">Neon Dystopia</h4>
+<p class="text-on-surface-variant max-w-md mb-8 text-base leading-relaxed">A curated journey through the darkest synthwave and cyberpunk beats. Algorithmically tailored for your late-night coding sessions.</p>
+<button class="flex items-center gap-2 bg-white text-[#020617] hover:bg-primary px-8 py-3.5 rounded-full transition-colors font-bold shadow-[0_0_20px_rgba(125,211,252,0.3)] hover:shadow-[0_0_30px_rgba(125,211,252,0.5)]">
+<span class="material-symbols-outlined" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                            Listen Now
+                        </button>
+</div>
+</div>
+<!-- Smaller Features -->
+<div class="flex flex-col gap-6">
+<div class="glass-panel rounded-3xl p-6 flex items-center gap-5 group hover:bg-white/5 transition-colors cursor-pointer border-white/5 hover:border-white/10">
+<div class="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-black/50">
+<img class="object-cover w-full h-full mix-blend-screen opacity-90 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500" data-alt="Abstract macro photography of frozen water droplets reflecting colorful light, intricate details, crystalline textures, dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeu36Ccg9eCrdYWkYOkGf_vO3t8GFiZNTLK6SBMExzDfLknZuoHtC2UwUuHX4O0CSb1_88Wkb41Icij9UQDHHFjyEd6_3rhB6Lcl5ta756Hz6VvBZ4uTaC0q_p9GklZGZbAP3d1oo-PCf5sq8XcxGghrjrTTLvmVvpiw3dQdLGfdxbRbaV0WS-jqpzFjRUqnAZNY1RyEYaW0-Hp7KRGFO8alOimJCvsy4barsdkQTDJY2L8Bp7ngrC"/>
+</div>
+<div>
+<h5 class="font-bold text-white text-lg">Crystalline</h5>
+<p class="text-sm text-on-surface-variant mt-1 font-medium">New Age / Ambient</p>
+</div>
+</div>
+<div class="glass-panel rounded-3xl p-6 flex items-center gap-5 group hover:bg-white/5 transition-colors cursor-pointer border-white/5 hover:border-white/10">
+<div class="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-black/50">
+<img class="object-cover w-full h-full mix-blend-screen opacity-90 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500" data-alt="A dark sleek vinyl record spinning, illuminated by a single streak of cyan laser light, high contrast, premium aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxkpZ3SoreChlQru1M4qJnZ29FU6oxA5BV0Onf6KEAuQDBBviYSorvkhP1e7dzW0hMq-r6OFLqp-pShtf5gDBKe5-SxkIpTOlc_hzeEZqJmr56-sEUZUEtlz7co7_qRDLslvw8CrA00By1IzrsFAR6osHmVnoZZ_HelKJEQtlmiBCPDioAYkxBgOEFI6wGzMnFluR1P7iQE52nz7zWVRkEB9GeuYIZ8oOxFro440A5MgyTE7sCKRJm"/>
+</div>
+<div>
+<h5 class="font-bold text-white text-lg">Deep Bass</h5>
+<p class="text-sm text-on-surface-variant mt-1 font-medium">Underground Club</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Mini Player -->
+<div class="fixed bottom-[104px] left-0 w-full px-4 z-40 hidden md:block">
+<div class="max-w-7xl mx-auto">
+<div class="glass-elevated rounded-2xl p-4 flex items-center gap-5">
+<div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-black/50">
+<img class="object-cover w-full h-full mix-blend-screen" data-alt="Album art featuring a glowing neon triangle in a dark smoky void, minimalist and atmospheric." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEk5Ut1sWsejsUHjOqLldWrqpnOOpx1d2hiC8WKV8zLHhHRDKg-j3A6m_f8yVmmhhN8kZq-n00VB-dxehGamAIAM95ktMQfeKWgIszlMj-jA06EZZc1JPR8SUGjS26rDKYYrShtryt7ESw24f2cWEbV8SV3uqSrAKCeADi0TRQWUF-PKgfdjEvvkWR3oWWmvpaeX2mFjKM2SJNXQ1lg2T45BOdwB3RBGaWq843vOoiODWNLlRTlqDm"/>
+</div>
+<div class="flex-grow overflow-hidden">
+<h5 class="font-bold text-white truncate text-base">Void Walkers</h5>
+<p class="text-sm text-primary truncate font-medium">Neon Dystopia Mix</p>
+</div>
+<div class="flex items-center gap-4 pr-3 text-white">
+<button class="hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]" data-icon="favorite">favorite</span>
+</button>
+<button class="hover:text-primary transition-colors bg-white/10 rounded-full p-1.5">
+<span class="material-symbols-outlined text-[28px]" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]" data-icon="skip_next" style="font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Mobile Floating Mini Player (Centered) -->
+<div class="fixed bottom-[104px] left-4 right-4 z-40 md:hidden">
+<div class="glass-elevated rounded-2xl p-3 flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-black/50">
+<img class="object-cover w-full h-full mix-blend-screen" data-alt="Album art featuring a glowing neon triangle in a dark smoky void, minimalist and atmospheric." src="https://lh3.googleusercontent.com/aida-public/AB6AXuABRUhknquQQ6MR21SXIjz5ODK6amGhYLi09MB5GRkzG0zGAcXpmcUA-MHpZYzO-M09-fNCev-MtzolQBSjEPHt21VJo-5Fs-N75OlCBYItCvwYlBz_e_90BUFjsants6E44vKJS2vTmZOiVrLwj5EeYvJpQ73GYDTcjbTXCqh12Mg2cCGzgq8JIkDIks4UbOOGYNjyfsWSEGe2jLnlztDz8TtN4zCKtomqF8lS86NoUovElpl8nAWp"/>
+</div>
+<div class="flex-grow overflow-hidden">
+<h5 class="font-bold text-white truncate text-sm">Void Walkers</h5>
+<p class="text-xs text-primary truncate font-medium">Neon Dystopia Mix</p>
+</div>
+<div class="flex items-center gap-3 text-white">
+<button class="hover:text-primary transition-colors p-1">
+<span class="material-symbols-outlined text-[20px]" data-icon="favorite">favorite</span>
+</button>
+<button class="hover:text-primary transition-colors bg-white/10 rounded-full p-1">
+<span class="material-symbols-outlined text-[28px]" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 bg-[#020617]/70 backdrop-blur-3xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] md:hidden">
+<div class="w-full flex justify-around items-center pt-4 pb-8 px-4">
+<!-- Home (Active) -->
+<button class="flex flex-col items-center justify-center text-primary scale-110 transition-transform active:scale-90 duration-150 group">
+<span class="material-symbols-outlined text-primary font-bold mb-1 drop-shadow-[0_0_8px_rgba(125,211,252,0.6)]" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label text-[10px] font-bold tracking-wide">Home</span>
+</button>
+<!-- Search -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-white active:scale-90 duration-150 transition-all group">
+<span class="material-symbols-outlined mb-1 group-hover:text-white" data-icon="search">search</span>
+<span class="font-label text-[10px] font-medium tracking-wide">Search</span>
+</button>
+<!-- Library -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-white active:scale-90 duration-150 transition-all group">
+<span class="material-symbols-outlined mb-1 group-hover:text-white" data-icon="library_music">library_music</span>
+<span class="font-label text-[10px] font-medium tracking-wide">Library</span>
+</button>
+<!-- Premium -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-white active:scale-90 duration-150 transition-all group">
+<span class="material-symbols-outlined mb-1 group-hover:text-white" data-icon="workspace_premium">workspace_premium</span>
+<span class="font-label text-[10px] font-medium tracking-wide">Premium</span>
+</button>
+</div>
+</nav>
+</body></html>

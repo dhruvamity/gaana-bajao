@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Now Playing - Glacier</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#0a4c6e",
+                    "on-primary": "#001f2e",
+                    "tertiary-fixed-dim": "#c8a0f0",
+                    "inverse-on-surface": "#0a0e1a",
+                    "on-surface-variant": "#a0b4c4",
+                    "secondary-fixed-dim": "#88b4cc",
+                    "on-secondary-fixed-variant": "#2a4a5e",
+                    "error": "#ff6b6b",
+                    "surface-dim": "#0f1524",
+                    "on-surface": "#e0e8f0",
+                    "surface-bright": "#1a2438",
+                    "inverse-surface": "#e0e8f0",
+                    "tertiary-container": "#3d2060",
+                    "primary": "#7dd3fc",
+                    "surface-container": "#141c2e",
+                    "on-primary-fixed-variant": "#004d73",
+                    "outline": "#4a6070",
+                    "on-secondary-fixed": "#0d1f2b",
+                    "on-tertiary-fixed-variant": "#4d2a73",
+                    "on-primary-container": "#c8eaff",
+                    "background": "#0a0e1a",
+                    "primary-fixed": "#c8eaff",
+                    "surface-container-low": "#111828",
+                    "on-background": "#e0e8f0",
+                    "primary-fixed-dim": "#7dd3fc",
+                    "surface-container-high": "#1a2438",
+                    "secondary": "#88b4cc",
+                    "on-tertiary": "#1a002e",
+                    "surface-container-lowest": "#0a0e1a",
+                    "primary-container": "#0e4d6e",
+                    "error-container": "#3d1414",
+                    "on-tertiary-fixed": "#1a002e",
+                    "surface-tint": "#7dd3fc",
+                    "on-primary-fixed": "#001f2e",
+                    "on-tertiary-container": "#e8d0ff",
+                    "surface": "#0f1524",
+                    "on-error": "#1a0000",
+                    "on-secondary": "#001f2e",
+                    "on-error-container": "#ffb3b3",
+                    "secondary-fixed": "#c0d8e8",
+                    "surface-container-highest": "#202c42",
+                    "tertiary-fixed": "#e8d0ff",
+                    "surface-variant": "#1a2438",
+                    "on-secondary-container": "#c0d8e8",
+                    "secondary-container": "#1a3a4e",
+                    "outline-variant": "#2a3a48",
+                    "tertiary": "#c8a0f0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.5rem",
+                    "lg": "1rem",
+                    "xl": "1.5rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "display": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>body {
+    font-family: "Inter", sans-serif;
+    background-color: theme("colors.background");
+    color: theme("colors.on-background");
+    margin: 0;
+    overflow: hidden;
+    /* Prevent scrolling on fullscreen player */
+    }
+.glass-panel {
+    background: rgba(15, 21, 36, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(125, 211, 252, 0.1)
+    }
+.glass-button {
+    background: rgba(15, 21, 36, 0.4);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(125, 211, 252, 0.05);
+    transition: all 0.2s ease
+    }
+.glass-button:hover {
+    background: rgba(125, 211, 252, 0.1);
+    border: 1px solid rgba(125, 211, 252, 0.2);
+    box-shadow: 0 0 15px rgba(125, 211, 252, 0.1)
+    }
+.glass-button:active {
+    transform: scale(0.95)
+    }
+.ambient-bg {
+    position: absolute;
+    inset: -20%;
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCWq_mnBZh9JxGU21_ETglwCkZww6l8PmjbFELmzYhjiTJF2k7StXDQ6swAzfdENCtfA4hvMpPKRdJSFM3KvzOpYzuA8XUyMtGUYS6dvA5-5k0SInHRcWU7wvKylfq5UGSrmzbbe02r1lldrQDMEwzwi71F7gSd1YVhcR7jkQ6JuIq4HKE9XctVibEclgCE1VQfyYQ2-wr7Imc2R5viMkvH-OXOy5XvJnSePd4GhDevzt3sfgJg3ttw);
+    background-size: cover;
+    background-position: center;
+    filter: blur(100px) saturate(1.5) opacity(0.6);
+    z-index: -1;
+    animation: pulse-bg 15s ease-in-out infinite alternate
+    }
+@keyframes pulse-bg {
+    0% {
+        transform: scale(1) rotate(0deg);
+        } 100% {
+        transform: scale(1.1) rotate(5deg);
+        }
+    }
+.album-art-shadow {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(125, 211, 252, 0.1)
+    }
+.progress-bar-glow {
+    box-shadow: 0 0 10px rgba(125, 211, 252, 0.5)
+    }
+/* Specific typography weights based on brand */
+.brand-headline {
+    font-weight: 600;
+    letter-spacing: -0.025em
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="h-screen w-screen relative flex flex-col items-center justify-center">
+<!-- Ambient Blurred Background mapped to Album Art -->
+<div class="ambient-bg" data-alt="Abstract gradient texture background featuring swirling icy blues, deep navies, and soft lavenders. Ethereal, moody, atmospheric lighting creating a dark glassmorphism aesthetic perfect for a music player background."></div>
+<div class="absolute inset-0 bg-background/40 mix-blend-multiply z-[-1]"></div>
+<!-- Top Navigation (Minimized for Now Playing) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 py-6">
+<button class="glass-button p-2 rounded-full text-on-surface hover:text-primary transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">expand_more</span>
+</button>
+<span class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest">Now Playing</span>
+<button class="glass-button p-2 rounded-full text-on-surface hover:text-primary transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">more_vert</span>
+</button>
+</header>
+<!-- Main Content Area -->
+<main class="w-full max-w-lg mx-auto px-6 sm:px-8 flex flex-col items-center justify-center h-full gap-8 z-10 pt-16 pb-24">
+<!-- Album Art -->
+<div class="w-full aspect-square relative rounded-2xl overflow-hidden album-art-shadow group">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="High fidelity album cover art featuring a surreal frozen landscape at twilight. Geometric ice structures glowing with soft cyan internal light against a deep navy blue sky. Minimalist, premium, atmospheric aesthetic matching the Glacier dark theme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcLvQZN92zaEqvnEHBSyCYM5GbCO4D6I0d1NCGZIFuzJgkEKNEj6Jnvc1KH6lfhAie08u0ewycS370_q9Fbuj8cyFv2_bMQZ87v3pTcqAZaeTtD0S4PIC3L0xxhUnGr-7b5h0J8SwctJOCjgfB85lNXlGrFQuPA_ZvXzWIbNXO_o8fozGqwKWRWpOwEfAXgbsg6_88NxaptvzAGRvxJXYiCctwOserRpNij6SktQBNSj8shiNdCvEl"/>
+<div class="absolute inset-0 border border-white/10 rounded-2xl pointer-events-none"></div>
+</div>
+<!-- Metadata & Actions -->
+<div class="w-full flex justify-between items-center mt-4">
+<div class="flex flex-col min-w-0 pr-4">
+<h1 class="font-display brand-headline text-2xl text-on-surface truncate pb-1">Midnight Horizon</h1>
+<h2 class="font-body text-base text-on-surface-variant truncate">Ethereal Frequencies</h2>
+</div>
+<button class="glass-button p-3 rounded-full text-primary hover:text-primary-fixed transition-colors flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+</div>
+<!-- Progress Bar -->
+<div class="w-full flex flex-col gap-2">
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden cursor-pointer relative group">
+<div class="absolute top-0 left-0 h-full w-[45%] bg-primary rounded-full progress-bar-glow transition-all duration-300"></div>
+<!-- Playhead (visible on hover/active) -->
+<div class="absolute top-1/2 left-[45%] w-3 h-3 bg-white rounded-full -translate-y-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-opacity"></div>
+</div>
+<div class="flex justify-between w-full font-label text-xs text-on-surface-variant">
+<span>1:45</span>
+<span>3:50</span>
+</div>
+</div>
+<!-- Playback Controls -->
+<div class="w-full flex items-center justify-between px-2">
+<!-- Shuffle -->
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">shuffle</span>
+</button>
+<!-- Previous -->
+<button class="glass-button p-4 rounded-full text-on-surface hover:text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">skip_previous</span>
+</button>
+<!-- Play/Pause -->
+<button class="w-20 h-20 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(125,211,252,0.15)] hover:shadow-[0_0_40px_rgba(125,211,252,0.3)] transition-all duration-300 active:scale-95">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<!-- Next -->
+<button class="glass-button p-4 rounded-full text-on-surface hover:text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+<!-- Repeat -->
+<button class="text-primary drop-shadow-[0_0_5px_rgba(125,211,252,0.5)] p-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">repeat</span>
+</button>
+</div>
+<!-- Bottom Actions (Devices/Lyrics) -->
+<div class="w-full flex justify-between items-center mt-4 px-2">
+<button class="text-on-surface-variant hover:text-primary flex items-center gap-2 transition-colors text-sm font-medium">
+<span class="material-symbols-outlined text-lg">devices</span>
+<span>Living Room Speaker</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-2 rounded-full">
+<span class="material-symbols-outlined text-xl">lyrics</span>
+</button>
+</div>
+</main>
+<!-- Using the JSON definition for BottomNavBar, but since this is a fullscreen playback "transactional/focused" screen, we SUPPRESS the bottom nav as per the rules. -->
+</body></html>
