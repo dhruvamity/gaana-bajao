@@ -42,16 +42,31 @@ export interface ScanSummary {
 }
 
 /**
- * Values that indicate a field was derived from a filename rather than a tag,
- * e.g. an "artist" of `001` produced by parsing `001 - Song Name.mp3`.
+ * Whether the stored value is confidently better than what the file declares.
+ *
+ * Only a value that looks deliberately curated is protected. Everything else is
+ * proposed for replacement, because a bulk upload derives title/artist/album
+ * from the filename and those values look perfectly plausible - "001" as an
+ * artist is obvious, but "Kaho Na Kaho (Lyric Video) | Murder" as a title is
+ * not, and it is still filename noise rather than the song's real title.
+ *
+ * Every proposal is shown in a preview before anything is written, so the
+ * bias is toward surfacing the file's own metadata and letting the user judge.
  */
-function looksAutoDerived(value: string | undefined): boolean {
-  if (!value) return true;
+function isProtectedValue(value: string | undefined): boolean {
+  if (!value) return false;
   const trimmed = value.trim();
-  if (!trimmed) return true;
-  if (/^\d{1,4}$/.test(trimmed)) return true;                 // 001, 42
-  if (/^(unknown artist|untitled track|single|music)$/i.test(trimmed)) return true;
-  return false;
+  if (!trimmed) return false;
+  if (/^\d{1,4}$/.test(trimmed)) return false;                       // 001, 42
+  if (/^(unknown artist|untitled track|single|music)$/i.test(trimmed)) return false;
+  // Hallmarks of a filename rather than a tag.
+  if (/\.(mp3|m4a|flac|wav|ogg|aac|opus)\b/i.test(trimmed)) return false;
+  if (/\((official|lyric|lyrical|full)\b[^)]*\)/i.test(trimmed)) return false;
+  if (/\b(full (video|audio) song|lyric video|official video|audio song)\b/i.test(trimmed)) return false;
+  if (/\|/.test(trimmed)) return false;                              // "Song | Movie"
+  if (/^["'\s]/.test(value)) return false;                           // leading quote/space
+  if (/_(spotdown|ytmp3|320kbps)/i.test(trimmed)) return false;
+  return true;
 }
 
 /** Read one track's real tags without writing anything. */
@@ -76,8 +91,8 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
     result.hasTags = Boolean(meta.title || meta.artist || meta.album || meta.genre);
     result.hasEmbeddedArt = Boolean(meta.coverBlob);
 
-    // Only propose a tag value over a field that was clearly auto-derived, so a
-    // title the user edited by hand is never silently overwritten.
+    // Propose the file's own value wherever it differs and the stored value is
+    // not obviously hand-curated.
     const candidates: Array<[keyof Track, string | null, string]> = [
       ['title', meta.title, track.title],
       ['artist', meta.artist, track.artist],
@@ -89,7 +104,7 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
       if (!proposed) continue;
       const trimmed = proposed.trim();
       if (!trimmed || trimmed === current) continue;
-      if (!looksAutoDerived(current)) continue;
+      if (isProtectedValue(current)) continue;
       result.proposedChanges.push({ field, from: current || '(empty)', to: trimmed });
     }
 

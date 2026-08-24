@@ -149,7 +149,7 @@ export const LibraryRepairPanel: React.FC = () => {
                   />
                   <Tag size={14} className="text-primary" />
                   <span>
-                    Fix titles and artist names{' '}
+                    Replace titles, artists and albums with the file&rsquo;s own tags{' '}
                     <span className="text-on-surface-variant">
                       ({scan.results.filter(r => r.proposedChanges.length > 0).length} tracks)
                     </span>
