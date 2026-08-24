@@ -367,13 +367,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const effectiveCover = getEffectiveCoverPreview();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-xl overflow-y-auto">
-      <div className="relative w-full max-w-2xl max-h-[90vh] my-auto flex flex-col rounded-3xl bg-surface-container border border-white/10 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-none overflow-y-auto">
+      <div className="relative w-full max-w-2xl max-h-[90vh] my-auto flex flex-col rounded-lg bg-surface-container border border-white/10 shadow-card overflow-hidden">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 bg-surface-container-high/40">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center">
+            <div className="w-10 h-10 rounded bg-primary/20 text-primary flex items-center justify-center">
               <UploadCloud size={22} />
             </div>
             <div>
@@ -398,21 +398,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           
           {/* Error & Success Messages */}
           {error && (
-            <div className="p-3.5 rounded-xl bg-error/15 border border-error/30 text-error text-xs flex items-center gap-2">
+            <div className="p-3.5 rounded bg-error/15 border border-error/30 text-error text-xs flex items-center gap-2">
               <AlertCircle size={16} className="flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {successCount !== null && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+            <div className="p-3.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
               <Check size={16} className="flex-shrink-0" />
               <span>Successfully uploaded and cataloged {successCount} tracks!</span>
             </div>
           )}
 
           {/* 1. Drop Zone */}
-          <div className="relative border-2 border-dashed border-white/15 hover:border-primary/60 rounded-2xl p-6 text-center transition-all bg-surface-container-high/30 group cursor-pointer">
+          <div className="relative border-2 border-dashed border-white/15 hover:border-primary/60 rounded-lg p-6 text-center transition-all bg-surface-container-high/30 group cursor-pointer">
             <input
               type="file"
               multiple
@@ -422,7 +422,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
             />
             <div className="flex flex-col items-center gap-2">
-              <div className="w-12 h-12 rounded-2xl bg-white/5 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-lg bg-white/5 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
                 <FileAudio size={24} />
               </div>
               <div className="text-sm font-bold text-white">
@@ -450,7 +450,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 {queue.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-xl bg-surface-container-high/70 border border-white/5 flex items-center gap-3"
+                    className="p-3 rounded bg-surface-container-high/70 border border-white/5 flex items-center gap-3"
                   >
                     {/* Per-track cover thumbnail */}
                     <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
@@ -548,7 +548,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 disabled={isProcessingBatch}
                 onChange={(e) => setGlobalGenre(e.target.value)}
                 placeholder="Leave empty to use per-track ID3 genre"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary placeholder-on-surface-variant/50"
+                className="w-full px-3.5 py-2.5 rounded bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary placeholder-on-surface-variant/50"
               />
             </div>
 
@@ -560,14 +560,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 disabled={isProcessingBatch}
                 onChange={(e) => setGlobalTags(e.target.value)}
                 placeholder="e.g. Focus, Chill, Late Night, Workout"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary placeholder-on-surface-variant/50"
+                className="w-full px-3.5 py-2.5 rounded bg-surface-container-high border border-white/10 text-white text-xs focus:outline-none focus:border-primary placeholder-on-surface-variant/50"
               />
             </div>
           </div>
 
           {/* Cover Art — shows extracted or manual */}
-          <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-high/40 border border-white/5">
-            <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 shadow-md flex-shrink-0 bg-white/5 flex items-center justify-center">
+          <div className="flex items-center gap-4 p-4 rounded-lg bg-surface-container-high/40 border border-white/5">
+            <div className="w-16 h-16 rounded overflow-hidden border border-white/10 shadow-md flex-shrink-0 bg-white/5 flex items-center justify-center">
               {effectiveCover ? (
                 <img src={effectiveCover} alt="Cover" className="w-full h-full object-cover" />
               ) : (
@@ -597,7 +597,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           </div>
 
           {/* 4. Playlist Attachment */}
-          <div className="space-y-3 p-4 rounded-2xl bg-surface-container-high/40 border border-white/5">
+          <div className="space-y-3 p-4 rounded-lg bg-surface-container-high/40 border border-white/5">
             <h3 className="text-xs font-bold uppercase text-on-surface-variant tracking-wider flex items-center gap-2">
               <FolderPlus size={15} className="text-primary" />
               <span>Playlist Attachment</span>
@@ -607,7 +607,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPlaylistMode('none')}
-                className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                className={`py-2 px-3 rounded border text-center transition-all cursor-pointer ${
                   playlistMode === 'none'
                     ? 'bg-primary text-black border-primary'
                     : 'bg-surface-container border-white/10 text-on-surface-variant hover:text-white'
@@ -619,7 +619,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPlaylistMode('existing')}
-                className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                className={`py-2 px-3 rounded border text-center transition-all cursor-pointer ${
                   playlistMode === 'existing'
                     ? 'bg-primary text-black border-primary'
                     : 'bg-surface-container border-white/10 text-on-surface-variant hover:text-white'
@@ -631,7 +631,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPlaylistMode('new')}
-                className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                className={`py-2 px-3 rounded border text-center transition-all cursor-pointer ${
                   playlistMode === 'new'
                     ? 'bg-primary text-black border-primary'
                     : 'bg-surface-container border-white/10 text-on-surface-variant hover:text-white'
@@ -650,7 +650,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <select
                     value={selectedPlaylistId}
                     onChange={(e) => setSelectedPlaylistId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                    className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
                   >
                     {existingPlaylists.map(pl => (
                       <option key={pl.id} value={pl.id} className="bg-surface-container text-white">
@@ -677,7 +677,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     value={newPlaylistTitle}
                     onChange={(e) => setNewPlaylistTitle(e.target.value)}
                     placeholder="e.g. Road Trip Bangers"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                    className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
                     required={playlistMode === 'new'}
                   />
                 </div>
@@ -690,7 +690,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     value={newPlaylistDescription}
                     onChange={(e) => setNewPlaylistDescription(e.target.value)}
                     placeholder="A brief description of this collection..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                    className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -719,7 +719,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isProcessingBatch}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-lg text-xs font-bold text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -727,7 +727,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <button
               type="submit"
               disabled={isProcessingBatch || queue.length === 0}
-              className="px-6 py-2.5 rounded-2xl text-xs font-extrabold text-black bg-primary hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary/20 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              className="px-6 py-2.5 rounded-lg text-xs font-extrabold text-black bg-primary hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-lg transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
             >
               {isProcessingBatch ? (
                 <>

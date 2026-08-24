@@ -104,7 +104,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
       </button>
 
       {/* Hero Banner with Glass Overlay */}
-      <section className="relative overflow-hidden rounded-3xl glass-elevated border border-white/10 h-72 sm:h-96 flex flex-col justify-end p-6 sm:p-10 shadow-2xl">
+      <section className="relative overflow-hidden rounded-lg glass-elevated border border-white/10 h-72 sm:h-96 flex flex-col justify-end p-6 sm:p-10 shadow-card">
         <CoverArt
           src={artist.bannerUrl}
           title={artist.name}
@@ -134,15 +134,15 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={() => artistTracks.length > 0 && playTrack(artistTracks[0], artistTracks)}
-              className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all"
+              className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
-              <Play size={18} fill="#001f2e" />
+              <Play size={18} fill="currentColor" />
               <span>Play All</span>
             </button>
 
             <button
               onClick={handleFollow}
-              className={`px-5 py-3 rounded-2xl text-sm font-semibold glass-pill border transition-all ${
+              className={`px-5 py-3 rounded-lg text-sm font-semibold glass-pill border transition-all ${
                 isFollowing ? 'bg-primary/20 text-primary border-primary/40' : 'text-white border-white/10 hover:border-white/30'
               }`}
             >
@@ -151,7 +151,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
             <button
               onClick={handleShare}
-              className="p-3 rounded-2xl glass-pill text-on-surface-variant hover:text-white transition-all relative"
+              className="p-3 rounded-lg glass-pill text-on-surface-variant hover:text-white transition-all relative"
             >
               <Share2 size={18} />
               {copiedShare && (
@@ -176,7 +176,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             return (
               <div
                 key={track.id}
-                className={`group p-3 sm:px-4 sm:py-3 rounded-2xl glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
+                className={`group p-3 sm:px-4 sm:py-3 rounded-lg glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
                   isTrackActive ? 'border-primary/50 bg-primary/10' : 'border-white/5'
                 }`}
               >
@@ -185,16 +185,16 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                     {idx + 1}
                   </span>
 
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+                  <div className="relative w-12 h-12 rounded overflow-hidden shadow-md flex-shrink-0">
                     <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                     <button
                       onClick={() => playTrack(track, artistTracks)}
                       className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       {isTrackActive && isPlaying ? (
-                        <Pause size={16} fill="#ffffff" />
+                        <Pause size={16} fill="currentColor" />
                       ) : (
-                        <Play size={16} fill="#ffffff" className="ml-0.5" />
+                        <Play size={16} fill="currentColor" className="ml-0.5" />
                       )}
                     </button>
                   </div>
@@ -232,11 +232,11 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                       isLiked ? 'text-primary' : 'text-on-surface-variant hover:text-white'
                     }`}
                   >
-                    <Heart size={16} fill={isLiked ? '#7dd3fc' : 'none'} />
+                    <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                   </button>
                   <button
                     onClick={() => playTrack(track, artistTracks)}
-                    className="p-2 rounded-xl glass-pill text-primary hover:bg-primary/20 transition-all"
+                    className="p-2 rounded glass-pill text-primary hover:bg-primary/20 transition-all"
                   >
                     {isTrackActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
                   </button>
@@ -249,12 +249,12 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
       {/* About & Genres Section */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 p-6 rounded-3xl glass-panel border border-white/10 space-y-3">
+        <div className="md:col-span-2 p-6 rounded-lg glass-panel border border-white/10 space-y-3">
           <h3 className="text-xl font-bold text-white">About the Artist</h3>
           <p className="text-sm text-on-surface-variant leading-relaxed">{artist.bio}</p>
         </div>
 
-        <div className="p-6 rounded-3xl glass-panel border border-white/10 space-y-3">
+        <div className="p-6 rounded-lg glass-panel border border-white/10 space-y-3">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <Sparkles size={16} className="text-primary" />
             <span>Genres & Style</span>

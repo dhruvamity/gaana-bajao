@@ -28,6 +28,8 @@ const MainAppContent: React.FC = () => {
   const { currentTrack } = useAudio();
 
   const [currentView, setCurrentView] = useState<string>('home');
+  // Owned here so the navbar search box and the search view share one query.
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
 
@@ -81,7 +83,7 @@ const MainAppContent: React.FC = () => {
   if (isLoading) {
     return (
       <div className="h-screen w-screen bg-background flex flex-col items-center justify-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary to-primary-container flex items-center justify-center animate-pulse shadow-xl shadow-primary/30">
+        <div className="w-16 h-16 rounded-lg bg-gradient-to-tr from-primary to-primary-container flex items-center justify-center animate-pulse shadow-xl ">
           <Music size={32} className="text-on-primary animate-spin" />
         </div>
         <p className="text-xs text-on-surface-variant font-bold tracking-widest uppercase">
@@ -97,7 +99,11 @@ const MainAppContent: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen bg-background text-on-background flex flex-col font-body antialiased selection:bg-primary/20 selection:text-primary overflow-hidden">
+    /* Spotify's shell: a pure-black frame with rounded panels floating on it
+       and a small gutter between them. The player bar sits on the black frame
+       at the bottom, in normal flow, so panels above it size correctly rather
+       than being overlapped by a fixed element. */
+    <div className="h-screen w-screen bg-background text-on-background flex flex-col font-body antialiased overflow-hidden">
       {/* 1. Top Integrated Navigation Bar */}
       <Navbar
         currentView={currentView}
@@ -106,12 +112,14 @@ const MainAppContent: React.FC = () => {
         }}
         onOpenUpload={() => setIsUploadOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
       />
 
       {/* 2. Three-Column Main Desktop Layout */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative gap-2 px-2 pb-2 min-h-0">
         {/* Left: Your Library Sidebar */}
-        <div className="hidden md:block h-full">
+        <div className="hidden md:block h-full min-h-0">
           <LibrarySidebar
             currentView={currentView}
             selectedPlaylistId={selectedPlaylist?.id}
@@ -126,7 +134,7 @@ const MainAppContent: React.FC = () => {
         </div>
 
         {/* Center: Main Scrollable Content Pane */}
-        <main className="flex-1 h-full overflow-y-auto bg-gradient-to-b from-surface-container-lowest/40 to-background scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+        <main className="flex-1 h-full min-w-0 overflow-y-auto app-panel bg-surface-container-lowest">
           {currentView === 'home' && (
             <HomeView
               onSelectArtist={handleSelectArtist}
@@ -138,7 +146,9 @@ const MainAppContent: React.FC = () => {
           )}
 
           {currentView === 'search' && (
-            <SearchExploreView 
+            <SearchExploreView
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
               onSelectArtist={handleSelectArtist}
               onOpenAddToPlaylist={handleOpenAddToPlaylist}
             />
@@ -171,7 +181,7 @@ const MainAppContent: React.FC = () => {
 
         {/* Right: Now Playing Side Panel (Collapsible) */}
         {isRightSidebarOpen && currentTrack && (
-          <div className="hidden lg:block h-full animate-in fade-in slide-in-from-right-4 duration-300">
+          <div className="hidden lg:block h-full min-h-0 animate-in fade-in slide-in-from-right-4">
             <NowPlayingSidebar
               onClose={() => setIsRightSidebarOpen(false)}
               onSelectArtist={handleSelectArtist}

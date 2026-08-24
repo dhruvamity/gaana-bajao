@@ -126,21 +126,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }, [tracks, activeCategory]);
 
   return (
-    <div className="space-y-8 pb-32 max-w-7xl mx-auto px-4 sm:px-8 pt-6">
+    <div className="space-y-6 pb-8 px-4 sm:px-6 pt-4">
       
       {/* 1. Category Chips Bar (Dynamically derived from actual uploaded music) */}
       {dynamicCategories.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none sticky top-16 z-20 py-2 bg-background/80 backdrop-blur-md -mx-4 px-4 sm:-mx-8 sm:px-8">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none sticky top-0 z-20 py-3 bg-surface-container-lowest -mx-4 px-4 sm:-mx-6 sm:px-6">
           {dynamicCategories.map(cat => {
             const isSelected = activeCategory === cat;
             return (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold capitalize transition-all cursor-pointer ${
+                aria-pressed={isSelected}
+                className={`px-3 py-1.5 rounded-full text-sm capitalize whitespace-nowrap transition-colors ${
                   isSelected
-                    ? 'bg-white text-black shadow-md scale-105'
-                    : 'bg-surface-container hover:bg-white/15 text-white'
+                    ? 'bg-white text-black font-medium'
+                    : 'bg-surface-container-high hover:bg-surface-container-highest text-white'
                 }`}
               >
                 {cat}
@@ -153,18 +154,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* Greeting Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h1 className="text-3xl sm:text-[2rem] font-bold text-white tracking-tight">
             {getGreeting()}{currentUser ? `, ${currentUser.name}` : ''}
           </h1>
-          <p className="text-xs text-on-surface-variant font-medium mt-0.5">
-            Cloud streaming catalog & high-fidelity playback
-          </p>
         </div>
 
         {onOpenUpload && (
           <button
             onClick={onOpenUpload}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-bold transition-all hover:scale-105 cursor-pointer shadow-lg shadow-primary/10"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black hover:scale-105 text-sm font-bold transition-transform"
           >
             <UploadCloud size={16} />
             <span>Upload Music</span>
@@ -175,13 +173,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* 2. Quick Access Cards (Liked Songs & Created Playlists) */}
       {quickCards.length > 0 && (
         <section className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
             {quickCards.map((card) => {
               const isLiked = card.isLikedCard;
               const playlist = card.playlist;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={card.id}
                   onClick={() => {
                     if (isLiked && onSelectLikedSongs) {
@@ -190,11 +189,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       onSelectPlaylist(playlist);
                     }
                   }}
-                  className="group relative flex items-center bg-surface-container hover:bg-surface-container-high rounded-lg overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-md"
+                  className="group relative flex items-center text-left bg-white/10 hover:bg-white/20 rounded overflow-hidden transition-colors"
                 >
                   {isLiked ? (
-                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-pink-500 flex items-center justify-center flex-shrink-0">
-                      <Heart size={24} fill="#ffffff" className="text-white" />
+                    <div className="w-16 h-16 bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center flex-shrink-0">
+                      <Heart size={24} fill="currentColor" className="text-white" />
                     </div>
                   ) : (
                     <CoverArt
@@ -205,8 +204,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     />
                   )}
 
-                  <div className="flex-1 px-3.5 py-2 min-w-0 pr-12">
-                    <h4 className="text-xs sm:text-sm font-bold text-white truncate group-hover:underline">
+                  <div className="flex-1 px-4 py-2 min-w-0 pr-12">
+                    <h4 className="text-sm sm:text-base font-bold text-white truncate">
                       {card.title}
                     </h4>
                   </div>
@@ -222,12 +221,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         playTrack(tracks[0], tracks);
                       }
                     }}
-                    className="absolute right-3 w-10 h-10 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all hover:scale-105"
+                    className="absolute right-4 w-12 h-12 rounded-full bg-primary hover:bg-primary-fixed hover:scale-105 text-on-primary flex items-center justify-center shadow-play opacity-0 group-hover:opacity-100 transition-all"
                     title="Play"
+                    aria-label={`Play ${card.title}`}
                   >
-                    <Play size={18} fill="currentColor" className="ml-0.5" />
+                    <Play size={20} fill="currentColor" className="ml-0.5" />
                   </button>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -237,28 +237,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* 3. User-Created Playlists Section */}
       {playlists.length > 0 && (
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                Collection
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Your Playlists
-              </h2>
-            </div>
-            <span className="text-xs text-on-surface-variant font-medium">
-              {playlists.length} {playlists.length === 1 ? 'playlist' : 'playlists'}
+          <div className="flex items-end justify-between">
+            <h2 className="text-2xl font-bold text-white tracking-tight hover:underline cursor-default">
+              Your Playlists
+            </h2>
+            <span className="text-sm font-bold text-on-surface-variant hover:text-white hover:underline cursor-pointer">
+              Show all
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
             {playlists.map((pl) => (
-              <div
+              <button
+                type="button"
                 key={pl.id}
                 onClick={() => onSelectPlaylist(pl)}
-                className="group p-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer space-y-3 relative hover:scale-102"
+                className="group p-3 rounded-lg text-left surface-card relative"
               >
-                <div className="relative aspect-square rounded-xl overflow-hidden shadow-md">
+                <div className="relative aspect-square rounded overflow-hidden shadow-card mb-3">
                   <CoverArt
                     src={pl.coverUrl}
                     title={pl.title}
@@ -274,22 +270,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       const plTracks = tracks.filter(t => pl.trackIds.includes(t.id));
                       if (plTracks.length > 0) playTrack(plTracks[0], plTracks);
                     }}
-                    className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105"
+                    className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-play opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105"
                     title="Play Playlist"
+                    aria-label={`Play ${pl.title}`}
                   >
-                    <Play size={18} fill="currentColor" className="ml-0.5" />
+                    <Play size={20} fill="currentColor" className="ml-0.5" />
                   </button>
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
-                    {pl.title}
-                  </h4>
-                  <p className="text-xs text-on-surface-variant truncate mt-0.5">
-                    {pl.trackIds.length} {pl.trackIds.length === 1 ? 'track' : 'tracks'} • By {pl.ownerName}
+                  <h4 className="text-base font-bold text-white truncate">{pl.title}</h4>
+                  <p className="text-sm text-on-surface-variant truncate mt-1 line-clamp-2">
+                    {pl.trackIds.length} {pl.trackIds.length === 1 ? 'track' : 'tracks'} &bull; {pl.ownerName}
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
@@ -298,21 +293,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* 4. Uploaded Tracks & Releases */}
       {filteredTracks.length > 0 ? (
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                Music Catalog
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                {activeCategory === 'all' ? 'Uploaded Tracks' : `Tracks in ${activeCategory}`}
-              </h2>
-            </div>
-            <span className="text-xs text-on-surface-variant font-medium">
+          <div className="flex items-end justify-between">
+            <h2 className="text-2xl font-bold text-white tracking-tight">
+              {activeCategory === 'all' ? 'Your tracks' : activeCategory}
+            </h2>
+            <span className="text-sm font-bold text-on-surface-variant">
               {filteredTracks.length} {filteredTracks.length === 1 ? 'track' : 'tracks'}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
             {filteredTracks.map((track) => {
               const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
               const isLiked = Boolean(currentUser?.likedTrackIds?.includes(track.id));
@@ -320,10 +310,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
               return (
                 <div
                   key={track.id}
-                  onClick={() => playTrack(track, filteredTracks)}
-                  className="group p-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer space-y-3 relative hover:scale-102"
+                  className="group p-3 rounded-lg surface-card relative"
                 >
-                  <div className="relative aspect-square rounded-xl overflow-hidden shadow-md">
+                  <div className="relative aspect-square rounded overflow-hidden shadow-card mb-3">
                     <CoverArt
                       src={track.coverUrl}
                       title={track.title}
@@ -342,34 +331,40 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           playTrack(track, filteredTracks);
                         }
                       }}
-                      className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all hover:scale-105"
+                      className={`absolute bottom-2 right-2 w-12 h-12 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-play transition-all hover:scale-105 ${
+                        isTrackPlaying
+                          ? 'opacity-100 translate-y-0'
+                          : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+                      }`}
                       title={isTrackPlaying ? 'Pause' : 'Play'}
+                      aria-label={`${isTrackPlaying ? 'Pause' : 'Play'} ${track.title}`}
                     >
                       {isTrackPlaying ? (
-                        <Pause size={18} fill="currentColor" />
+                        <Pause size={20} fill="currentColor" />
                       ) : (
-                        <Play size={18} fill="currentColor" className="ml-0.5" />
+                        <Play size={20} fill="currentColor" className="ml-0.5" />
                       )}
                     </button>
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
+                    <h4 className={`text-base font-bold truncate ${currentTrack?.id === track.id ? 'text-primary' : 'text-white'}`}>
                       {track.title}
                     </h4>
-                    <p 
+                    <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (track.artistId) onSelectArtist(track.artistId);
                       }}
-                      className="text-xs text-on-surface-variant hover:text-white hover:underline cursor-pointer transition-colors truncate mt-0.5"
+                      className="block max-w-full text-sm text-on-surface-variant hover:text-white hover:underline transition-colors truncate mt-1 text-left"
                     >
                       {track.artist}
-                    </p>
+                    </button>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[11px] text-on-surface-variant">
-                    <span className="text-primary font-medium truncate max-w-[90px]">{track.genre || 'Music'}</span>
+                  <div className="flex items-center justify-between pt-2 mt-2 border-t border-white/5 text-2xs text-on-surface-variant">
+                    <span className="truncate max-w-[90px]">{track.genre || 'Music'}</span>
                     <div className="flex items-center gap-1">
                       {onOpenAddToPlaylist && (
                         <button
@@ -393,7 +388,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           isLiked ? 'text-primary' : 'hover:text-white'
                         }`}
                       >
-                        <Heart size={14} fill={isLiked ? '#7dd3fc' : 'none'} />
+                        <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                       </button>
                     </div>
                   </div>
@@ -404,23 +399,23 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </section>
       ) : (
         /* Empty Catalog Hero CTA */
-        <div className="p-12 text-center rounded-3xl bg-surface-container/60 border border-white/10 space-y-5 max-w-lg mx-auto my-8">
-          <div className="w-18 h-18 mx-auto rounded-3xl bg-gradient-to-tr from-primary/30 to-primary-container/20 text-primary flex items-center justify-center shadow-xl shadow-primary/10">
+        <div className="p-12 text-center rounded-lg bg-surface-container space-y-5 max-w-lg mx-auto my-8">
+          <div className="w-18 h-18 mx-auto rounded-full bg-surface-container-high text-primary flex items-center justify-center">
             <UploadCloud size={36} />
           </div>
           <div className="space-y-1.5">
-            <h3 className="text-xl font-black text-white">Your Cloud Music Library is Empty</h3>
-            <p className="text-xs text-on-surface-variant max-w-sm mx-auto leading-relaxed">
+            <h3 className="text-2xl font-bold text-white">Your library is empty</h3>
+            <p className="text-sm text-on-surface-variant max-w-sm mx-auto leading-relaxed">
               Upload your audio files (.mp3, .wav, .flac) to Cloudinary. They will automatically appear in your catalog with acoustic analysis, lyrics, and custom playlists!
             </p>
           </div>
           {onOpenUpload && (
             <button
               onClick={onOpenUpload}
-              className="px-6 py-3.5 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-xs inline-flex items-center gap-2 shadow-xl hover:scale-105 transition-all cursor-pointer"
+              className="px-8 py-3.5 rounded-full bg-white hover:scale-105 text-black font-bold text-sm inline-flex items-center gap-2 transition-transform"
             >
               <UploadCloud size={16} />
-              <span>Upload Songs to Cloudinary</span>
+              <span>Upload music</span>
             </button>
           )}
         </div>
@@ -429,28 +424,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* 5. Artists Section (Derived only when tracks exist) */}
       {artists.length > 0 && (
         <section className="space-y-4 pt-4 border-t border-white/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                Artists
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Artists in Your Catalog
-              </h2>
-            </div>
-            <span className="text-xs text-on-surface-variant font-medium">
+          <div className="flex items-end justify-between">
+            <h2 className="text-2xl font-bold text-white tracking-tight">Artists</h2>
+            <span className="text-sm font-bold text-on-surface-variant">
               {artists.length} {artists.length === 1 ? 'artist' : 'artists'}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
             {artists.map((artist) => (
-              <div
+              <button
+                type="button"
                 key={artist.id}
                 onClick={() => onSelectArtist(artist.id)}
-                className="group p-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer space-y-3 text-center hover:scale-102"
+                className="group p-3 rounded-lg surface-card text-left"
               >
-                <div className="relative aspect-square rounded-full overflow-hidden shadow-md mx-auto max-w-[140px]">
+                <div className="relative aspect-square rounded-full overflow-hidden shadow-card mb-3">
                   <CoverArt
                     src={artist.avatarUrl}
                     title={artist.name}
@@ -460,14 +449,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
-                    {artist.name}
-                  </h4>
-                  <p className="text-xs text-on-surface-variant truncate mt-0.5">
-                    Artist • {artist.genres.slice(0, 2).join(', ')}
-                  </p>
+                  <h4 className="text-base font-bold text-white truncate">{artist.name}</h4>
+                  <p className="text-sm text-on-surface-variant truncate mt-1">Artist</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>

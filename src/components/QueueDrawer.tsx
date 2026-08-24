@@ -44,9 +44,9 @@ export const QueueDrawer: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex justify-end animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-none flex justify-end animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-md h-full glass-elevated border-l border-white/15 p-6 shadow-2xl flex flex-col justify-between overflow-hidden"
+        className="w-full max-w-md h-full glass-elevated border-l border-white/15 p-6 shadow-card flex flex-col justify-between overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
@@ -78,7 +78,7 @@ export const QueueDrawer: React.FC = () => {
           </div>
 
           {/* Autoplay Switch */}
-          <div className="p-3 rounded-xl glass-subtle flex items-center justify-between">
+          <div className="p-3 rounded glass-subtle flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-primary" />
               <span className="text-xs font-semibold text-white">Autoplay Similar Music</span>
@@ -108,8 +108,8 @@ export const QueueDrawer: React.FC = () => {
                 Now Playing
               </span>
 
-              <div className="p-3.5 rounded-2xl bg-primary/10 border border-primary/40 flex items-center justify-between gap-3">
-                <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+              <div className="p-3.5 rounded-lg bg-primary/10 border border-primary/40 flex items-center justify-between gap-3">
+                <div className="relative w-12 h-12 rounded overflow-hidden shadow-md flex-shrink-0">
                   <CoverArt src={currentTrack.coverUrl} title={currentTrack.title} artist={currentTrack.artist} id={currentTrack.id} className="w-full h-full object-cover" />
                 </div>
 
@@ -133,7 +133,7 @@ export const QueueDrawer: React.FC = () => {
             </span>
 
             {upNextTracks.length === 0 ? (
-              <div className="p-8 text-center glass-subtle rounded-2xl border border-white/5 space-y-1">
+              <div className="p-8 text-center glass-subtle rounded-lg border border-white/5 space-y-1">
                 <p className="text-xs font-medium text-white">Queue is empty</p>
                 <p className="text-[11px] text-on-surface-variant">
                   Similar tracks will automatically play when the current track finishes.
@@ -147,7 +147,7 @@ export const QueueDrawer: React.FC = () => {
                   return (
                     <div
                       key={track.id + idx}
-                      className="group p-2.5 rounded-2xl glass-panel border border-white/5 hover:border-primary/30 flex items-center justify-between gap-3 transition-all"
+                      className="group p-2.5 rounded-lg glass-panel border border-white/5 hover:border-primary/30 flex items-center justify-between gap-3 transition-all"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
@@ -156,7 +156,7 @@ export const QueueDrawer: React.FC = () => {
                             onClick={() => playTrack(track, queue)}
                             className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <Play size={14} fill="#ffffff" className="ml-0.5" />
+                            <Play size={14} fill="currentColor" className="ml-0.5" />
                           </button>
                         </div>
 

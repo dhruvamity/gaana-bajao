@@ -105,7 +105,7 @@ export const LibraryRepairPanel: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="p-3.5 rounded-2xl bg-primary/10 border border-primary/20 text-xs text-primary font-medium flex items-start gap-2">
+      <div className="p-3.5 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary font-medium flex items-start gap-2">
         <Wand2 size={16} className="flex-shrink-0 mt-0.5" />
         <span>
           Re-reads the ID3 tags inside your uploaded audio files to recover album art, titles and
@@ -115,7 +115,7 @@ export const LibraryRepairPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-error/15 border border-error/30 text-error text-xs flex items-center gap-2">
+        <div className="p-3.5 rounded bg-error/15 border border-error/30 text-error text-xs flex items-center gap-2">
           <AlertCircle size={16} className="flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -147,7 +147,7 @@ export const LibraryRepairPanel: React.FC = () => {
               { label: 'With art', value: scan.withEmbeddedArt },
               { label: 'Repairable', value: scan.repairable }
             ].map(stat => (
-              <div key={stat.label} className="p-3 rounded-xl bg-surface-container-high/60 border border-white/5">
+              <div key={stat.label} className="p-3 rounded bg-surface-container-high/60 border border-white/5">
                 <div className="text-lg font-black text-white tabular-nums">{stat.value}</div>
                 <div className="text-[10px] uppercase tracking-wider text-on-surface-variant font-bold">
                   {stat.label}
@@ -169,7 +169,7 @@ export const LibraryRepairPanel: React.FC = () => {
                   : 'text-error border-error/25 bg-error/10';
                 const example = scan.results.find(r => r.diagnosis === key && (r.detail || r.error));
                 return (
-                  <div key={key} className={`p-3 rounded-xl border text-[11px] leading-relaxed ${tone}`}>
+                  <div key={key} className={`p-3 rounded border text-[11px] leading-relaxed ${tone}`}>
                     <div className="font-bold flex items-center gap-1.5">
                       <Info size={12} />
                       <span>{count} {count === 1 ? 'track' : 'tracks'} &mdash; {copy.label}</span>
@@ -186,7 +186,7 @@ export const LibraryRepairPanel: React.FC = () => {
           </div>
 
           {scan.repairable === 0 ? (
-            <div className="p-4 rounded-xl bg-surface-container-high/40 border border-white/5 text-xs text-on-surface-variant leading-relaxed">
+            <div className="p-4 rounded bg-surface-container-high/40 border border-white/5 text-xs text-on-surface-variant leading-relaxed">
               <p className="font-bold text-white mb-1">Nothing to repair.</p>
               <p>See the breakdown above for why. Tracks with no embedded artwork show a cover generated from the track name, so each stays visually distinct.</p>
             </div>
@@ -244,7 +244,7 @@ export const LibraryRepairPanel: React.FC = () => {
 
               {/* Preview of proposed metadata changes */}
               {restoreMetadata && (
-                <div className="max-h-44 overflow-y-auto rounded-xl bg-black/30 border border-white/10 divide-y divide-white/5">
+                <div className="max-h-44 overflow-y-auto rounded bg-black/30 border border-white/10 divide-y divide-white/5">
                   {scan.results
                     .filter(r => r.proposedChanges.length > 0)
                     .slice(0, 40)
@@ -269,7 +269,7 @@ export const LibraryRepairPanel: React.FC = () => {
       )}
 
       {repair && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs space-y-1">
+        <div className="p-3.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs space-y-1">
           <div className="flex items-center gap-2 font-bold">
             <Check size={16} />
             <span>Repair complete</span>
@@ -289,7 +289,7 @@ export const LibraryRepairPanel: React.FC = () => {
           type="button"
           onClick={handleScan}
           disabled={busy}
-          className="px-4 py-2 rounded-xl glass-subtle text-xs font-bold text-white hover:bg-white/10 disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+          className="px-4 py-2 rounded glass-subtle text-xs font-bold text-white hover:bg-white/10 disabled:opacity-40 flex items-center gap-1.5 transition-colors"
         >
           {phase === 'scanning' ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           <span>{scan ? 'Rescan library' : 'Scan library'}</span>
@@ -300,7 +300,7 @@ export const LibraryRepairPanel: React.FC = () => {
             type="button"
             onClick={handleRepair}
             disabled={busy || (!restoreArtwork && !restoreMetadata)}
-            className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+            className="px-5 py-2 rounded bg-primary hover:bg-primary-fixed text-on-primary text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 transition-colors"
           >
             {phase === 'repairing' ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
             <span>Repair {scan.repairable} track{scan.repairable === 1 ? '' : 's'}</span>

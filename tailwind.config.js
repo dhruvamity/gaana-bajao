@@ -4,82 +4,168 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        "inverse-primary": "#0a4c6e",
-        "on-primary": "#001f2e",
-        "tertiary-fixed-dim": "#c8a0f0",
-        "inverse-on-surface": "#0a0e1a",
-        "on-surface-variant": "#94a3b8",
-        "secondary-fixed-dim": "#88b4cc",
-        "on-secondary-fixed-variant": "#2a4a5e",
-        "error": "#ff6b6b",
-        "surface-dim": "#0f1524",
-        "on-surface": "#ffffff",
-        "surface-bright": "#1a2438",
-        "inverse-surface": "#e0e8f0",
-        "tertiary-container": "#3d2060",
-        "primary": "#7dd3fc",
-        "surface-container": "#141c2e",
-        "on-primary-fixed-variant": "#004d73",
-        "outline": "#4a6070",
-        "on-secondary-fixed": "#0d1f2b",
-        "on-tertiary-fixed-variant": "#4d2a73",
-        "on-primary-container": "#c8eaff",
-        "background": "#020617",
-        "primary-fixed": "#c8eaff",
-        "surface-container-low": "#111828",
-        "on-background": "#ffffff",
-        "primary-fixed-dim": "#7dd3fc",
-        "surface-container-high": "#1a2438",
-        "secondary": "#88b4cc",
-        "on-tertiary": "#1a002e",
-        "surface-container-lowest": "#0a0e1a",
-        "primary-container": "#0e4d6e",
-        "error-container": "#3d1414",
-        "on-tertiary-fixed": "#1a002e",
-        "surface-tint": "#7dd3fc",
-        "on-primary-fixed": "#001f2e",
-        "on-tertiary-container": "#e8d0ff",
-        "surface": "#0f1524",
-        "on-error": "#1a0000",
-        "on-secondary": "#001f2e",
-        "on-error-container": "#ffb3b3",
-        "secondary-fixed": "#c0d8e8",
-        "surface-container-highest": "#202c42",
-        "tertiary-fixed": "#e8d0ff",
-        "surface-variant": "#1a2438",
-        "on-secondary-container": "#c0d8e8",
-        "secondary-container": "#1a3a4e",
-        "outline-variant": "#2a3a48",
-        "tertiary": "#c8a0f0",
-        "brand-dark": "#020617",
-        "brand-card": "rgba(15, 23, 42, 0.45)",
+        // ------------------------------------------------------------------
+        // Palette modelled on Spotify's surface ladder: a pure-black app shell
+        // with panels floating on top of it, each step up the ladder lifting
+        // the surface toward the viewer.
+        //
+        // Token names are kept from the previous Material-style scheme so the
+        // whole app re-themes from one place rather than every component
+        // needing to be rewritten.
+        // ------------------------------------------------------------------
+        "background": "#000000",                    // app shell
+        "surface-container-lowest": "#121212",      // panels (sidebar, main, right rail)
+        "surface-container-low": "#181818",         // cards at rest
+        "surface-container": "#181818",
+        "surface-container-high": "#282828",        // card hover / raised control
+        "surface-container-highest": "#3E3E3E",     // pressed
+        "surface": "#121212",
+        "surface-dim": "#0A0A0A",
+        "surface-bright": "#282828",
+        "surface-variant": "#242424",
+        "surface-tint": "#1ED760",
+
+        // Foregrounds
+        "on-background": "#FFFFFF",
+        "on-surface": "#FFFFFF",
+        "on-surface-variant": "#B3B3B3",            // subdued body text
+        "outline": "#727272",                       // subdued icons
+        "outline-variant": "#292929",               // hairlines
+
+        // Brand accent
+        "primary": "#1ED760",
+        "primary-fixed": "#3BE477",                 // hover (brighter)
+        "primary-fixed-dim": "#1DB954",             // pressed (classic green)
+        "primary-container": "#1DB954",
+        "on-primary": "#000000",                    // black on green
+        "on-primary-container": "#000000",
+        "on-primary-fixed": "#000000",
+        "on-primary-fixed-variant": "#000000",
+        "inverse-primary": "#1DB954",
+
+        // Neutral secondary
+        "secondary": "#B3B3B3",
+        "secondary-container": "#282828",
+        "on-secondary": "#000000",
+        "on-secondary-container": "#FFFFFF",
+        "secondary-fixed": "#E5E5E5",
+        "secondary-fixed-dim": "#B3B3B3",
+        "on-secondary-fixed": "#000000",
+        "on-secondary-fixed-variant": "#282828",
+
+        // Tertiary reads as "muted white surface" rather than a second hue
+        "tertiary": "#FFFFFF",
+        "tertiary-container": "#282828",
+        "tertiary-fixed": "#FFFFFF",
+        "tertiary-fixed-dim": "#B3B3B3",
+        "on-tertiary": "#000000",
+        "on-tertiary-container": "#FFFFFF",
+        "on-tertiary-fixed": "#000000",
+        "on-tertiary-fixed-variant": "#282828",
+
+        "inverse-surface": "#FFFFFF",
+        "inverse-on-surface": "#121212",
+
+        // Status
+        "error": "#F15E6C",
+        "error-container": "#2A1214",
+        "on-error": "#000000",
+        "on-error-container": "#F7A6AE",
+
+        "brand-dark": "#000000",
+        "brand-card": "#181818",
       },
+
       borderRadius: {
-        "DEFAULT": "0.5rem",
-        "lg": "1rem",
-        "xl": "1.5rem",
-        "2xl": "2rem",
-        "full": "9999px"
+        // Monotonic on purpose. The previous scale overrode lg/xl/2xl but left
+        // 3xl at its default, which made `rounded-3xl` (1.5rem) SMALLER than
+        // `rounded-2xl` (2rem) — so large containers ended up less rounded than
+        // the cards sitting inside them.
+        "none": "0",
+        "sm": "0.125rem",   //  2px
+        "DEFAULT": "0.25rem", //  4px  - album art in list rows
+        "md": "0.375rem",   //  6px
+        "lg": "0.5rem",     //  8px  - cards and panels (Spotify's default)
+        "xl": "0.75rem",    // 12px
+        "2xl": "1rem",      // 16px
+        "3xl": "1.5rem",    // 24px
+        "full": "9999px"    //       - pills, buttons, avatars
       },
+
+      spacing: {
+        // Values the components already reference. Without these the classes
+        // compile to nothing, which is why the player bar had no height and the
+        // collapsed sidebar had no width.
+        "18": "4.5rem",   // 72px
+        "22": "5.5rem",   // 88px - player bar height
+        "84": "21rem",    // 336px - right rail
+        "88": "22rem",
+      },
+
+      scale: {
+        "102": "1.02",
+      },
+
       fontFamily: {
-        headline: ["Inter", "sans-serif"],
-        display: ["Inter", "sans-serif"],
-        body: ["Inter", "sans-serif"],
-        label: ["Inter", "sans-serif"]
+        headline: ["Figtree", "Inter", "system-ui", "sans-serif"],
+        display: ["Figtree", "Inter", "system-ui", "sans-serif"],
+        body: ["Figtree", "Inter", "system-ui", "sans-serif"],
+        label: ["Figtree", "Inter", "system-ui", "sans-serif"]
       },
-      animation: {
-        'pulse-subtle': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'float': 'float 6s ease-in-out infinite',
+
+      fontSize: {
+        // A real scale, so components stop reaching for arbitrary bracket
+        // values like text-[9px] that fall below a readable floor.
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }],      // 11px
+        "xs": ["0.75rem", { lineHeight: "1rem" }],         // 12px
+        "sm": ["0.875rem", { lineHeight: "1.25rem" }],     // 14px
+        "base": ["1rem", { lineHeight: "1.5rem" }],        // 16px
       },
+
+      boxShadow: {
+        // Spotify uses shadow sparingly, mostly to lift the play button.
+        "card": "0 8px 24px rgba(0,0,0,.5)",
+        "play": "0 8px 16px rgba(0,0,0,.4)",
+      },
+
       keyframes: {
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" }
+        },
+        "slide-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" }
+        },
+        "slide-down": {
+          from: { opacity: "0", transform: "translateY(-8px)" },
+          to: { opacity: "1", transform: "translateY(0)" }
+        },
+        "slide-left": {
+          from: { opacity: "0", transform: "translateX(16px)" },
+          to: { opacity: "1", transform: "translateX(0)" }
+        },
+        "zoom-in": {
+          from: { opacity: "0", transform: "scale(.97)" },
+          to: { opacity: "1", transform: "scale(1)" }
+        },
         float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-6px)' },
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-6px)" }
         }
+      },
+
+      animation: {
+        "fade-in": "fade-in .2s ease-out both",
+        "slide-up": "slide-up .25s cubic-bezier(.3,0,.4,1) both",
+        "slide-down": "slide-down .18s cubic-bezier(.3,0,.4,1) both",
+        "slide-left": "slide-left .25s cubic-bezier(.3,0,.4,1) both",
+        "zoom-in": "zoom-in .2s cubic-bezier(.3,0,.4,1) both",
+        "pulse-subtle": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        float: "float 6s ease-in-out infinite"
       }
     },
   },

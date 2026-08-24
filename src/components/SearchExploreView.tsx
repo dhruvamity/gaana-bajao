@@ -22,6 +22,9 @@ import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
 
 interface SearchExploreViewProps {
+  /** Query shared with the navbar search box. */
+  query: string;
+  onQueryChange: (query: string) => void;
   onSelectArtist?: (artistId: string) => void;
   onOpenAddToPlaylist?: (track: Track) => void;
 }
@@ -47,13 +50,15 @@ function getGenreGradient(genre: string): string {
 }
 
 export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
+  query,
+  onQueryChange,
   onSelectArtist,
   onOpenAddToPlaylist
 }) => {
   const { playTrack, currentTrack, isPlaying, logInteraction } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = query;
   const [catalog, setCatalog] = useState<Track[]>([]);
   const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
@@ -122,7 +127,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
   }, [searchQuery, selectedGenre, minEnergy, catalog]);
 
   const handlePromptClick = (promptText: string) => {
-    setSearchQuery(promptText);
+    onQueryChange(promptText);
     setIsAiProcessing(true);
     setTimeout(() => {
       setIsAiProcessing(false);
@@ -153,9 +158,9 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Search songs, artists, or moods (e.g. 'late night focus')..."
-              className="w-full pl-11 pr-11 py-3 rounded-2xl glass-elevated border border-white/15 text-white placeholder-on-surface-variant text-xs sm:text-sm focus:outline-none focus:border-primary/60 transition-all"
+              className="w-full pl-11 pr-11 py-3 rounded-lg glass-elevated border border-white/15 text-white placeholder-on-surface-variant text-xs sm:text-sm focus:outline-none focus:border-primary/60 transition-all"
             />
             {isAiProcessing && (
               <Sparkles size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-primary animate-spin" />
@@ -164,7 +169,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
 
           <button
             onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-            className={`p-3 rounded-2xl glass-pill transition-all ${
+            className={`p-3 rounded-lg glass-pill transition-all ${
               isFiltersOpen ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white'
             }`}
             title="Audio Filters"
@@ -183,7 +188,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
               <button
                 key={prompt}
                 onClick={() => handlePromptClick(prompt)}
-                className="px-3 py-1.5 rounded-xl glass-pill border border-white/10 text-xs text-on-surface-variant hover:text-white hover:border-primary/40 transition-all"
+                className="px-3 py-1.5 rounded glass-pill border border-white/10 text-xs text-on-surface-variant hover:text-white hover:border-primary/40 transition-all"
               >
                 {prompt}
               </button>
@@ -193,7 +198,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
 
         {/* Advanced Acoustic Filters Tray */}
         {isFiltersOpen && (
-          <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+          <div className="p-4 rounded-lg glass-panel border border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center justify-between text-xs font-bold text-white">
               <span className="flex items-center gap-1.5"><Activity size={14} className="text-primary" /> Minimum Acoustic Energy</span>
               <span>{Math.round(minEnergy * 100)}%</span>
@@ -225,7 +230,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
           <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
             Browse by Dynamic Catalog Genres
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
             {availableGenres.map((genre) => {
               const isSelected = selectedGenre?.toLowerCase() === genre.toLowerCase();
               const gradient = getGenreGradient(genre);
@@ -234,8 +239,8 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                 <button
                   key={genre}
                   onClick={() => setSelectedGenre(isSelected ? null : genre)}
-                  className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} border text-left transition-all relative overflow-hidden group ${
-                    isSelected ? 'border-primary shadow-lg shadow-primary/20 scale-105' : 'border-white/10 hover:border-white/25'
+                  className={`p-4 rounded-lg bg-gradient-to-br ${gradient} border text-left transition-all relative overflow-hidden group ${
+                    isSelected ? 'border-primary shadow-lg  scale-105' : 'border-white/10 hover:border-white/25'
                   }`}
                 >
                   <span className="text-xs sm:text-sm font-extrabold text-white block truncate">
@@ -263,7 +268,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
         </div>
 
         {filteredTracks.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl glass-panel border border-white/5 space-y-2">
+          <div className="p-12 text-center rounded-lg glass-panel border border-white/5 space-y-2">
             <Music size={32} className="mx-auto text-on-surface-variant opacity-40" />
             <p className="text-sm font-semibold text-white">No matching tracks found</p>
             <p className="text-xs text-on-surface-variant">Try searching for a different song, artist, or genre.</p>
@@ -277,7 +282,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
               return (
                 <div
                   key={track.id}
-                  className={`group p-3 sm:px-4 sm:py-3 rounded-2xl glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
+                  className={`group p-3 sm:px-4 sm:py-3 rounded-lg glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
                     isTrackActive ? 'border-primary/50 bg-primary/10' : 'border-white/5'
                   }`}
                 >
@@ -286,16 +291,16 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                       {idx + 1}
                     </span>
 
-                    <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+                    <div className="relative w-12 h-12 rounded overflow-hidden shadow-md flex-shrink-0">
                       <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                       <button
                         onClick={() => playTrack(track, filteredTracks)}
                         className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       >
                         {isTrackActive && isPlaying ? (
-                          <Pause size={16} fill="#ffffff" />
+                          <Pause size={16} fill="currentColor" />
                         ) : (
-                          <Play size={16} fill="#ffffff" className="ml-0.5" />
+                          <Play size={16} fill="currentColor" className="ml-0.5" />
                         )}
                       </button>
                     </div>
@@ -338,11 +343,11 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                         isLiked ? 'text-primary' : 'text-on-surface-variant hover:text-white'
                       }`}
                     >
-                      <Heart size={16} fill={isLiked ? '#7dd3fc' : 'none'} />
+                      <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                     </button>
                     <button
                       onClick={() => playTrack(track, filteredTracks)}
-                      className="p-2 rounded-xl glass-pill text-primary hover:bg-primary/20 transition-all cursor-pointer"
+                      className="p-2 rounded glass-pill text-primary hover:bg-primary/20 transition-all cursor-pointer"
                     >
                       {isTrackActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
                     </button>

@@ -115,8 +115,8 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       </button>
 
       {/* Playlist Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl glass-elevated border border-white/10 p-6 sm:p-8 flex flex-col md:flex-row items-center md:items-end gap-6 sm:gap-8 shadow-2xl">
-        <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 group">
+      <section className="relative overflow-hidden rounded-lg glass-elevated border border-white/10 p-6 sm:p-8 flex flex-col md:flex-row items-center md:items-end gap-6 sm:gap-8 shadow-card">
+        <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-lg overflow-hidden shadow-card flex-shrink-0 group">
           <CoverArt
             src={currentPlaylist.coverUrl}
             title={currentPlaylist.title}
@@ -166,9 +166,9 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
         <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
           <button
             onClick={() => tracks.length > 0 && playTrack(tracks[0], tracks)}
-            className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all"
+            className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl hover:scale-105 active:scale-95 transition-all"
           >
-            <Play size={18} fill="#001f2e" />
+            <Play size={18} fill="currentColor" />
             <span>Play</span>
           </button>
 
@@ -180,7 +180,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                 playTrack(randomTrack, tracks);
               }
             }}
-            className="p-3 rounded-2xl glass-pill text-on-surface-variant hover:text-white transition-all"
+            className="p-3 rounded-lg glass-pill text-on-surface-variant hover:text-white transition-all"
             title="Shuffle Play"
           >
             <Shuffle size={18} />
@@ -189,7 +189,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
           {isOwnerOrCollaborator && (
             <button
               onClick={() => setIsAddTracksOpen(!isAddTracksOpen)}
-              className={`p-3 rounded-2xl glass-pill transition-all ${
+              className={`p-3 rounded-lg glass-pill transition-all ${
                 isAddTracksOpen ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white'
               }`}
               title="Add Tracks"
@@ -200,7 +200,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
 
           <button
             onClick={handleShare}
-            className="p-3 rounded-2xl glass-pill text-on-surface-variant hover:text-white transition-all relative"
+            className="p-3 rounded-lg glass-pill text-on-surface-variant hover:text-white transition-all relative"
             title="Share Playlist"
           >
             <Share2 size={18} />
@@ -215,7 +215,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
 
       {/* Add Tracks Drawer */}
       {isAddTracksOpen && (
-        <section className="p-6 rounded-3xl glass-elevated border border-primary/30 space-y-4 animate-in fade-in slide-in-from-top-2">
+        <section className="p-6 rounded-lg glass-elevated border border-primary/30 space-y-4 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Plus size={16} className="text-primary" />
@@ -231,15 +231,15 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
               value={trackSearchQuery}
               onChange={(e) => setTrackSearchQuery(e.target.value)}
               placeholder="Search catalog to add songs..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-52 overflow-y-auto pr-1">
+          <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] max-h-52 overflow-y-auto pr-1">
             {availableToAdd.map(t => (
               <div
                 key={t.id}
-                className="p-2.5 rounded-2xl glass-panel border border-white/5 flex items-center justify-between gap-3"
+                className="p-2.5 rounded-lg glass-panel border border-white/5 flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <CoverArt src={t.coverUrl} title={t.title} artist={t.artist} id={t.id} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
@@ -265,13 +265,13 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       {/* Playlist Tracks List */}
       <section className="space-y-2">
         {tracks.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl glass-subtle border border-white/5 space-y-2">
+          <div className="p-12 text-center rounded-lg glass-subtle border border-white/5 space-y-2">
             <Music size={32} className="mx-auto text-on-surface-variant opacity-40" />
             <p className="text-sm font-semibold text-white">No tracks in this playlist</p>
             {isOwnerOrCollaborator && (
               <button
                 onClick={() => setIsAddTracksOpen(true)}
-                className="mt-2 px-4 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs inline-flex items-center gap-1.5"
+                className="mt-2 px-4 py-1.5 rounded bg-primary text-on-primary font-bold text-xs inline-flex items-center gap-1.5"
               >
                 <Plus size={14} />
                 <span>Add Songs</span>
@@ -286,7 +286,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
             return (
               <div
                 key={track.id}
-                className={`group p-3 sm:px-4 sm:py-3 rounded-2xl glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
+                className={`group p-3 sm:px-4 sm:py-3 rounded-lg glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
                   isTrackActive ? 'border-primary/50 bg-primary/10' : 'border-white/5'
                 }`}
               >
@@ -295,16 +295,16 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                     {idx + 1}
                   </span>
 
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+                  <div className="relative w-12 h-12 rounded overflow-hidden shadow-md flex-shrink-0">
                     <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                     <button
                       onClick={() => playTrack(track, tracks)}
                       className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       {isTrackActive && isPlaying ? (
-                        <Pause size={16} fill="#ffffff" />
+                        <Pause size={16} fill="currentColor" />
                       ) : (
-                        <Play size={16} fill="#ffffff" className="ml-0.5" />
+                        <Play size={16} fill="currentColor" className="ml-0.5" />
                       )}
                     </button>
                   </div>
@@ -349,7 +349,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       isLiked ? 'text-primary' : 'text-on-surface-variant hover:text-white'
                     }`}
                   >
-                    <Heart size={16} fill={isLiked ? '#7dd3fc' : 'none'} />
+                    <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                   </button>
 
                   {/* Remove from this playlist */}
@@ -365,7 +365,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
 
                   <button
                     onClick={() => playTrack(track, tracks)}
-                    className="p-2 rounded-xl glass-pill text-primary hover:bg-primary/20 transition-all"
+                    className="p-2 rounded glass-pill text-primary hover:bg-primary/20 transition-all"
                   >
                     {isTrackActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
                   </button>

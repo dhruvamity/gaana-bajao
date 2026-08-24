@@ -23,13 +23,18 @@ interface NavbarProps {
   setCurrentView: (view: string) => void;
   onOpenUpload: () => void;
   onOpenSettings: () => void;
+  /** Shared with SearchExploreView so typing here actually searches. */
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentView,
   setCurrentView,
   onOpenUpload,
-  onOpenSettings
+  onOpenSettings,
+  searchQuery,
+  onSearchQueryChange
 }) => {
   const { 
     currentUser, 
@@ -53,17 +58,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-surface-container-lowest/90 backdrop-blur-2xl px-4 sm:px-6 py-2.5 flex items-center justify-between border-b border-white/5 gap-4">
+    <header className="z-40 w-full bg-background px-4 sm:px-6 py-2 flex items-center justify-between gap-4 flex-shrink-0">
       {/* 1. Left: Brand & Home Navigation Button */}
       <div className="flex items-center gap-3 sm:gap-4">
         <button 
           onClick={() => setCurrentView('home')}
           className="flex items-center gap-2.5 group text-left"
         >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-primary-fixed flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
-            <span className="material-symbols-outlined text-on-primary text-xl font-bold">graphic_eq</span>
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+            <span className="material-symbols-outlined text-on-primary text-lg font-bold">graphic_eq</span>
           </div>
-          <h1 className="font-headline font-bold text-lg tracking-tight text-white hidden sm:inline">
+          <h1 className="font-headline font-bold text-base tracking-tight text-white hidden sm:inline">
             Gaana-Bajao
           </h1>
         </button>
@@ -71,41 +76,56 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Circular Home Icon button */}
         <button
           onClick={() => setCurrentView('home')}
-          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
             currentView === 'home'
-              ? 'bg-white text-black shadow-md'
-              : 'bg-white/10 text-white/80 hover:text-white hover:bg-white/20 hover:scale-105'
+              ? 'bg-surface-container-high text-white'
+              : 'bg-surface-container text-on-surface-variant hover:text-white hover:bg-surface-container-high'
           }`}
           title="Home"
+          aria-label="Home"
+          aria-current={currentView === 'home' ? 'page' : undefined}
         >
-          <Home size={19} />
+          <Home size={22} fill={currentView === 'home' ? 'currentColor' : 'none'} />
         </button>
       </div>
 
       {/* 2. Center: Global Search Input Pill */}
-      <div className="flex-1 max-w-lg mx-auto">
-        <div 
-          onClick={() => currentView !== 'search' && setCurrentView('search')}
-          className="relative flex items-center group cursor-pointer"
+      <div className="flex-1 max-w-[474px] mx-auto">
+        <form
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setCurrentView('search');
+          }}
+          className="relative flex items-center group"
         >
-          <Search size={18} className="absolute left-3.5 text-on-surface-variant group-hover:text-white transition-colors" />
+          <Search
+            size={18}
+            className="absolute left-3.5 text-on-surface-variant group-focus-within:text-white transition-colors pointer-events-none"
+          />
           <input
-            type="text"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => {
+              onSearchQueryChange(e.target.value);
+              if (currentView !== 'search') setCurrentView('search');
+            }}
             onFocus={() => setCurrentView('search')}
             placeholder="What do you want to play?"
-            className="w-full pl-10 pr-10 py-2.5 rounded-full bg-surface-container border border-transparent hover:border-white/20 focus:border-white/40 text-white text-xs sm:text-sm placeholder-on-surface-variant focus:outline-none transition-all"
+            aria-label="Search for songs, artists or moods"
+            className="w-full h-12 pl-11 pr-12 rounded-full bg-surface-container hover:bg-surface-container-high focus:bg-surface-container-high border border-transparent focus:border-white/20 text-white text-sm placeholder-on-surface-variant focus:outline-none transition-colors"
           />
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setCurrentView('search');
-            }}
-            className="absolute right-3 p-1 text-on-surface-variant hover:text-white"
+          <span className="absolute right-12 w-px h-6 bg-white/20" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={() => setCurrentView('search')}
+            className="absolute right-3 p-1 text-on-surface-variant hover:text-white transition-colors"
             title="Browse all"
+            aria-label="Browse all"
           >
-            <Compass size={16} />
+            <Compass size={20} />
           </button>
-        </div>
+        </form>
       </div>
 
       {/* 3. Right: Action Buttons & User Profile */}
@@ -113,30 +133,30 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Upload Audio Track */}
         <button
           onClick={onOpenUpload}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-black hover:bg-white/90 font-bold text-xs shadow-md transition-all hover:scale-102"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black hover:bg-white/90 hover:scale-105 font-bold text-sm transition-all"
         >
-          <Plus size={15} strokeWidth={2.5} />
-          <span className="hidden md:inline">Upload Music</span>
+          <Plus size={16} strokeWidth={2.5} />
+          <span className="hidden md:inline">Upload</span>
         </button>
 
         {/* Connect & Devices */}
         <button
           onClick={() => setIsConnectOpen(true)}
-          className="p-2.5 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-white transition-all relative"
+          className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors hover:scale-105"
           title="Connect to a device"
+          aria-label="Connect to a device"
         >
-          <Cast size={18} />
-          <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
-          <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-primary"></span>
+          <Cast size={20} />
         </button>
 
         {/* Settings */}
         <button
           onClick={onOpenSettings}
-          className="p-2.5 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-white transition-all"
+          className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors hover:scale-105"
           title="Settings"
+          aria-label="Settings"
         >
-          <Settings size={18} />
+          <Settings size={20} />
         </button>
 
         {/* User Account Button & Dropdown */}
@@ -144,28 +164,32 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative" ref={profileRef}>
             <button
               onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-              className="flex items-center gap-2 p-1 pr-2 rounded-full bg-surface-container hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+              className="flex items-center gap-2 p-1 pr-2 rounded-full bg-black hover:bg-surface-container-high transition-colors cursor-pointer"
               title="Account"
+              aria-label="Account menu"
+              aria-expanded={isProfileDropdownOpen}
+              aria-haspopup="menu"
             >
               <CoverArt
                 src={currentUser.avatar}
                 title={currentUser.name}
                 id={currentUser.id}
                 loading="eager"
-                className="w-7 h-7 rounded-full object-cover ring-1 ring-primary/50"
+                className="w-8 h-8 rounded-full object-cover"
               />
-              <span className="text-xs font-bold text-white hidden md:inline">{currentUser.name}</span>
-              <ChevronDown size={13} className="text-on-surface-variant" />
+              <span className="text-sm font-bold text-white hidden md:inline">{currentUser.name}</span>
+              <ChevronDown size={16} className="text-on-surface-variant" />
             </button>
 
             {isProfileDropdownOpen && (
               <div 
-                className="absolute right-0 mt-2 w-60 glass-elevated rounded-2xl border border-white/15 shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2 space-y-1"
+                role="menu"
+                className="absolute right-0 mt-2 w-56 bg-surface-container-high rounded-lg shadow-card p-1 z-50 animate-in fade-in slide-in-from-top-2"
               >
                 <div className="px-3 py-2 border-b border-white/10 mb-1">
-                  <div className="text-xs font-bold text-white truncate">{currentUser.name}</div>
+                  <div className="text-sm font-bold text-white truncate">{currentUser.name}</div>
                   {currentUser.email && (
-                    <div className="text-[11px] text-on-surface-variant truncate">{currentUser.email}</div>
+                    <div className="text-2xs text-on-surface-variant truncate">{currentUser.email}</div>
                   )}
                 </div>
 
@@ -174,10 +198,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setIsUserModalOpen(true);
                     setIsProfileDropdownOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white hover:bg-white/10 font-bold transition-all text-left"
+                  role="menuitem"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded text-sm text-white hover:bg-white/10 transition-colors text-left"
                 >
-                  <Settings size={14} className="text-primary" />
-                  <span>Account & Profile</span>
+                  <Settings size={16} className="text-on-surface-variant" />
+                  <span>Account &amp; Profile</span>
                 </button>
 
                 <button
@@ -185,10 +210,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setIsOnboardingOpen(true);
                     setIsProfileDropdownOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white hover:bg-white/10 font-bold transition-all text-left"
+                  role="menuitem"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded text-sm text-white hover:bg-white/10 transition-colors text-left"
                 >
-                  <Sparkles size={14} className="text-tertiary" />
-                  <span>Customize Taste Vector</span>
+                  <Sparkles size={16} className="text-on-surface-variant" />
+                  <span>Music preferences</span>
                 </button>
               </div>
             )}

@@ -56,61 +56,62 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
   };
 
   return (
-    <aside className="w-72 sm:w-84 bg-surface-container-lowest/90 backdrop-blur-2xl border-l border-white/5 flex flex-col h-full select-none transition-all flex-shrink-0 overflow-y-auto pb-28 scrollbar-thin scrollbar-thumb-white/10">
+    <aside className="w-84 app-panel bg-surface-container-lowest flex flex-col h-full select-none flex-shrink-0 overflow-y-auto">
       {/* Top Header */}
-      <div className="p-4 flex items-center justify-between border-b border-white/5 sticky top-0 bg-surface-container-lowest/95 backdrop-blur-md z-10">
-        <h3 className="text-sm font-bold text-white truncate max-w-[190px]">
+      <div className="px-4 py-3 flex items-center justify-between sticky top-0 bg-surface-container-lowest z-10">
+        <h3 className="text-base font-bold text-white truncate max-w-[220px]">
           {currentTrack.album || currentTrack.title}
         </h3>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-white transition-all"
-            title="Close panel"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors"
+          title="Close panel"
+          aria-label="Close now playing panel"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <div className="p-4 space-y-5">
         {/* Large Album Artwork */}
-        <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl group ring-1 ring-white/10">
+        <div className="relative aspect-square w-full rounded-lg overflow-hidden shadow-card group">
           <CoverArt
             src={currentTrack.coverUrl}
             title={currentTrack.title}
             artist={currentTrack.artist}
             id={currentTrack.id}
             loading="eager"
-            className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-102' : 'scale-100'}`}
+            className="w-full h-full object-cover"
           />
         </div>
 
         {/* Track Title & Artist */}
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-extrabold text-white tracking-tight truncate hover:underline cursor-pointer">
+            <h2 className="text-2xl font-bold text-white tracking-tight truncate hover:underline cursor-pointer">
               {currentTrack.title}
             </h2>
-            <p
+            <button
+              type="button"
               onClick={() => {
                 if (currentTrack.artistId) {
                   onSelectArtist(currentTrack.artistId);
                 }
               }}
-              className="text-xs font-semibold text-on-surface-variant hover:text-white cursor-pointer transition-colors truncate mt-0.5"
+              className="block max-w-full text-sm text-on-surface-variant hover:text-white hover:underline transition-colors truncate mt-1 text-left"
             >
               {currentTrack.artist}
-            </p>
+            </button>
           </div>
 
           <div className="flex items-center gap-1">
             {onOpenAddToPlaylist && (
               <button
                 onClick={() => onOpenAddToPlaylist(currentTrack)}
-                className="p-2 rounded-full text-on-surface-variant hover:text-white transition-all"
+                className="p-2 rounded-full text-on-surface-variant hover:text-white transition-colors"
                 title="Add to playlist"
+                aria-label="Add to playlist"
               >
                 <FolderPlus size={18} />
               </button>
@@ -121,19 +122,21 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
                 toggleLikeTrack(currentTrack.id);
                 logInteraction(isLiked ? 'unlike' : 'like', currentTrack.id);
               }}
-              className={`p-2 rounded-full transition-all ${
+              className={`p-2 rounded-full transition-colors ${
                 isLiked ? 'text-primary' : 'text-on-surface-variant hover:text-white'
               }`}
-              title={isLiked ? 'Unlike' : 'Like'}
+              title={isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+              aria-label={isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+              aria-pressed={isLiked}
             >
-              <Heart size={18} fill={isLiked ? '#7dd3fc' : 'none'} />
+              <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
             </button>
           </div>
         </div>
 
         {/* About the Artist Card */}
         {artist && (
-          <div className="relative rounded-2xl overflow-hidden bg-surface-container/60 border border-white/10 group hover:border-primary/30 transition-all">
+          <div className="relative rounded-lg overflow-hidden bg-surface-container group">
             <div className="relative h-44 overflow-hidden">
               <CoverArt
                 src={artist.bannerUrl || artist.avatarUrl}
@@ -142,7 +145,7 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
                 className="w-full h-full object-cover filter brightness-75 group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container/40 to-transparent" />
-              <span className="absolute top-3 left-3 text-xs font-bold text-white uppercase tracking-wider">
+              <span className="absolute top-3 left-3 text-base font-bold text-white">
                 About the artist
               </span>
             </div>
@@ -155,20 +158,20 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
                 >
                   {artist.name}
                 </h4>
-                <p className="text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5">
-                  <Users size={12} />
+                <p className="text-sm text-on-surface-variant flex items-center gap-1.5 mt-1">
+                  <Users size={14} />
                   <span>{artist.monthlyListeners.toLocaleString()} monthly listeners</span>
                 </p>
               </div>
 
-              <p className="text-xs text-on-surface-variant line-clamp-3 leading-relaxed">
+              <p className="text-sm text-on-surface-variant line-clamp-2 leading-relaxed">
                 {artist.bio}
               </p>
 
               <div className="pt-1 flex items-center justify-between">
                 <button
                   onClick={() => setIsFollowing(!isFollowing)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                  className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-all ${
                     isFollowing
                       ? 'border-white/30 text-white hover:border-white'
                       : 'bg-white text-black border-white hover:scale-105'
@@ -179,7 +182,7 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
 
                 <button
                   onClick={() => onSelectArtist(artist.id)}
-                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                  className="text-sm font-bold text-on-surface-variant hover:text-white hover:underline flex items-center gap-1"
                 >
                   <span>View Discography</span>
                 </button>
@@ -190,14 +193,15 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
 
         {/* Next in Queue Card */}
         {nextTrack && (
-          <div className="p-3.5 rounded-2xl bg-surface-container/60 border border-white/10 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              <span>Next in Queue</span>
+          <div className="p-4 rounded-lg bg-surface-container space-y-3">
+            <div className="flex items-center justify-between text-base font-bold text-white">
+              <span>Next in queue</span>
             </div>
 
-            <div 
+            <button
+              type="button"
               onClick={() => playTrack(nextTrack, queue)}
-              className="flex items-center justify-between gap-3 group cursor-pointer"
+              className="w-full flex items-center justify-between gap-3 group text-left"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <CoverArt
@@ -205,20 +209,18 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
                   title={nextTrack.title}
                   artist={nextTrack.artist}
                   id={nextTrack.id}
-                  className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                  className="w-10 h-10 rounded object-cover flex-shrink-0"
                 />
                 <div className="min-w-0">
-                  <h5 className="text-xs font-bold text-white group-hover:text-primary transition-colors truncate">
-                    {nextTrack.title}
-                  </h5>
-                  <p className="text-[11px] text-on-surface-variant truncate">{nextTrack.artist}</p>
+                  <h5 className="text-sm font-bold text-white truncate">{nextTrack.title}</h5>
+                  <p className="text-2xs text-on-surface-variant truncate">{nextTrack.artist}</p>
                 </div>
               </div>
 
-              <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-primary group-hover:text-on-primary flex items-center justify-center text-white transition-all flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-primary group-hover:text-on-primary flex items-center justify-center text-white transition-colors flex-shrink-0">
                 <Play size={14} fill="currentColor" className="ml-0.5" />
               </div>
-            </div>
+            </button>
           </div>
         )}
       </div>
