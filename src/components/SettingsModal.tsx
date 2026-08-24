@@ -8,9 +8,11 @@ import {
   Activity, 
   ShieldCheck, 
   Terminal,
-  Trash2
+  Trash2,
+  Wand2
 } from 'lucide-react';
 import { initFirebase, DatabaseService } from '../services/firebase';
+import { LibraryRepairPanel } from './LibraryRepairPanel';
 import { TelemetryEvent } from '../types';
 
 interface SettingsModalProps {
@@ -23,7 +25,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [projectId, setProjectId] = useState('');
   const [storageBucket, setStorageBucket] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'firebase' | 'telemetry'>('firebase');
+  const [activeTab, setActiveTab] = useState<'library' | 'firebase' | 'telemetry'>('library');
   const [telemetryEvents, setTelemetryEvents] = useState<TelemetryEvent[]>([]);
 
   useEffect(() => {
@@ -103,6 +105,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         {/* Tab Toggle */}
         <div className="flex items-center gap-2 bg-surface-container p-1 rounded-xl border border-white/10">
           <button
+            onClick={() => setActiveTab('library')}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'library' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant hover:text-white'
+            }`}
+          >
+            <Wand2 size={14} />
+            <span>Library Repair</span>
+          </button>
+          <button
             onClick={() => setActiveTab('firebase')}
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'firebase' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant hover:text-white'
@@ -122,7 +133,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </button>
         </div>
 
-        {/* Tab 1: Firebase Form */}
+        {/* Tab 1: Library repair */}
+        {activeTab === 'library' && <LibraryRepairPanel />}
+
+        {/* Tab 2: Firebase Form */}
         {activeTab === 'firebase' && (
           <form onSubmit={handleSaveFirebase} className="space-y-4">
             <div className="p-3.5 rounded-2xl bg-primary/10 border border-primary/20 text-xs text-primary font-medium flex items-center gap-2">
