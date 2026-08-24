@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { UserProfile, TimeOfDay, ActivityContext, DeviceType } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { ConnectSyncService } from '../services/connectSync';
@@ -37,8 +37,8 @@ function detectTimeOfDay(): TimeOfDay {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Instant cookie recovery: if we have a valid cookie, user is immediately authenticated
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    // 1. Instant recovery from cookie if available
     const cookie = getAuthCookie();
     if (cookie) {
       return {
@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
+  // If we have a cookie, skip loading entirely — user is already "authenticated" 
   const [isLoading, setIsLoading] = useState<boolean>(() => !getAuthCookie());
   const [sessionDaysRemaining, setSessionDaysRemaining] = useState<number>(30);
 
@@ -66,8 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
 
+  // Ref to track whether an explicit login call is in progress 
+  // (prevents onAuthStateChanged from racing with our login methods)
+  const loginInProgressRef = useRef(false);
+
   // Sync cookie helper with 30-day max-age
-  const syncSessionCookie = (user: UserProfile) => {
+  const syncSessionCookie = useCallback((user: UserProfile) => {
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
     const session: StoredSession = {
       uid: user.id,
@@ -78,22 +83,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setAuthCookie(session, 30);
     setSessionDaysRemaining(30);
-  };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const initSession = async () => {
       try {
+        // 1. Check for redirect result first (if user was redirected back from Google sign-in)
+        const redirectProfile = await DatabaseService.handleRedirectResult();
+        if (redirectProfile && isMounted) {
+          setCurrentUser(redirectProfile);
+          syncSessionCookie(redirectProfile);
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Enhance cookie-restored profile with full database data  
         const storedCookie = getAuthCookie();
         if (storedCookie) {
           const daysLeft = Math.ceil((storedCookie.expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
           if (isMounted) setSessionDaysRemaining(Math.max(1, daysLeft));
 
-          // Enhance profile with full database document
-          const fullProfile = await DatabaseService.getUserById(storedCookie.uid);
-          if (fullProfile && isMounted) {
-            setCurrentUser(fullProfile);
+          // Try to get full profile from database (local first, then Firestore)
+          try {
+            const fullProfile = await DatabaseService.getUserById(storedCookie.uid);
+            if (fullProfile && isMounted) {
+              setCurrentUser(fullProfile);
+            }
+          } catch {
+            // Firestore read failed — cookie profile is good enough
           }
         }
       } catch (e) {
@@ -106,41 +125,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initSession();
 
     // Firebase Auth State Listener
+    // IMPORTANT: This is guarded by loginInProgressRef to prevent race conditions
+    // when our explicit login methods (loginWithGoogle, loginWithGuest) are in progress
     const unsubscribe = DatabaseService.onAuthChanged(async (fbUser) => {
+      // Skip if an explicit login call is handling this
+      if (loginInProgressRef.current || DatabaseService.isLoginInProgress()) {
+        return;
+      }
+
       if (fbUser && isMounted) {
-        const existing = await DatabaseService.getUserById(fbUser.uid);
-        const resolved: UserProfile = {
-          id: fbUser.uid,
-          name: fbUser.displayName || existing?.name || 'Music Fan',
-          email: fbUser.email || existing?.email || undefined,
-          avatar: fbUser.photoURL || existing?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${fbUser.uid}`,
-          isOnboarded: existing ? existing.isOnboarded : false,
-          selectedGenres: existing ? existing.selectedGenres : [],
-          selectedVibes: existing ? existing.selectedVibes : [],
-          likedTrackIds: existing ? existing.likedTrackIds : [],
-          savedPlaylistIds: existing ? existing.savedPlaylistIds : [],
-          recentTrackIds: existing ? existing.recentTrackIds : []
-        };
-        
-        setCurrentUser(resolved);
-        syncSessionCookie(resolved);
-        setIsLoading(false);
+        // Only update if we don't already have this user set (prevents unnecessary re-renders)
+        try {
+          const existing = await DatabaseService.getUserById(fbUser.uid);
+          const resolved: UserProfile = {
+            id: fbUser.uid,
+            name: fbUser.displayName || existing?.name || 'Music Fan',
+            email: fbUser.email || existing?.email || undefined,
+            avatar: fbUser.photoURL || existing?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${fbUser.uid}`,
+            isOnboarded: existing ? existing.isOnboarded : false,
+            selectedGenres: existing?.selectedGenres || [],
+            selectedVibes: existing?.selectedVibes || [],
+            likedTrackIds: existing?.likedTrackIds || [],
+            savedPlaylistIds: existing?.savedPlaylistIds || [],
+            recentTrackIds: existing?.recentTrackIds || []
+          };
+          
+          if (isMounted) {
+            setCurrentUser(resolved);
+            syncSessionCookie(resolved);
+            setIsLoading(false);
+          }
+        } catch (e) {
+          console.warn('onAuthStateChanged profile resolution error:', e);
+          // Don't clear user — keep whatever we have
+        }
       }
     });
 
-    // Safety timeout to prevent stuck loading
+    // Safety timeout to prevent stuck loading screen
     const timer = setTimeout(() => {
       if (isMounted) setIsLoading(false);
-    }, 1200);
+    }, 2500);
 
     return () => {
       isMounted = false;
       unsubscribe();
       clearTimeout(timer);
     };
-  }, []);
+  }, [syncSessionCookie]);
 
   const loginWithGoogle = async (): Promise<UserProfile> => {
+    loginInProgressRef.current = true;
     setIsLoading(true);
     try {
       const userProfile = await DatabaseService.loginWithGoogle();
@@ -151,12 +186,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsOnboardingOpen(true);
       }
       return userProfile;
+    } catch (err: any) {
+      // If redirect is in progress, don't clear loading — page will redirect
+      if (err.message === 'REDIRECT_IN_PROGRESS') {
+        // Keep loading spinner — the page will navigate away
+        throw err;
+      }
+      throw err;
     } finally {
+      loginInProgressRef.current = false;
       setIsLoading(false);
     }
   };
 
   const loginWithGuest = async (guestName = 'Guest Listener'): Promise<UserProfile> => {
+    loginInProgressRef.current = true;
     setIsLoading(true);
     try {
       const userProfile = await DatabaseService.loginWithDemo(guestName);
@@ -168,6 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return userProfile;
     } finally {
+      loginInProgressRef.current = false;
       setIsLoading(false);
     }
   };

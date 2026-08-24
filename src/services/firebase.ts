@@ -18,6 +18,8 @@ import {
   Auth, 
   GoogleAuthProvider, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged,
   User as FirebaseUser 
@@ -68,6 +70,9 @@ export function isDummyPlaylist(p: Partial<Playlist>): boolean {
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let auth: Auth | null = null;
+
+// Flag to prevent onAuthStateChanged from racing with explicit login calls
+let _loginInProgress = false;
 
 // Initialize Firebase if credentials exist
 export function initFirebase(config?: Record<string, string>) {
@@ -199,57 +204,46 @@ export class DatabaseService {
       name: string;
       tracks: Track[];
       genres: Set<string>;
-      coverUrl: string;
     }>();
 
     tracks.forEach(track => {
-      if (isDummyTrack(track)) return;
-      const artistKey = track.artistId || track.artist.toLowerCase().replace(/\s+/g, '-');
-      if (!artistMap.has(artistKey)) {
-        artistMap.set(artistKey, {
+      const artistId = 'artist_' + track.artist.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (!artistMap.has(artistId)) {
+        artistMap.set(artistId, {
           name: track.artist,
           tracks: [],
-          genres: new Set(),
-          coverUrl: track.coverUrl
+          genres: new Set()
         });
       }
-      const entry = artistMap.get(artistKey)!;
+      const entry = artistMap.get(artistId)!;
       entry.tracks.push(track);
       if (track.genre) entry.genres.add(track.genre);
     });
 
-    const dynamicArtists: Artist[] = [];
-    artistMap.forEach((val, key) => {
-      const totalPlays = val.tracks.reduce((acc, t) => acc + (t.playCount || 0), 0);
-      const totalSaves = val.tracks.reduce((acc, t) => acc + (t.saveCount || 0), 0);
-      dynamicArtists.push({
-        id: key,
-        name: val.name,
-        avatarUrl: val.coverUrl,
-        bannerUrl: val.coverUrl,
-        bio: `${val.name} is featured on Gaana-Bajao with ${val.tracks.length} releases in the catalog.`,
-        monthlyListeners: Math.max(1200, totalPlays * 3 + totalSaves * 10),
-        genres: Array.from(val.genres),
-        topTrackIds: val.tracks.slice(0, 5).map(t => t.id),
-        albumIds: [],
-        velocity: totalPlays > 500 ? '+35% Velocity' : 'Trending Now'
-      });
-    });
-
-    return dynamicArtists;
+    return Array.from(artistMap.entries()).map(([id, data]) => ({
+      id,
+      name: data.name,
+      avatarUrl: data.tracks[0]?.coverUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
+      bannerUrl: data.tracks[0]?.coverUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
+      bio: `Artist with ${data.tracks.length} track${data.tracks.length !== 1 ? 's' : ''}`,
+      genres: Array.from(data.genres),
+      monthlyListeners: Math.floor(Math.random() * 50000) + 1000,
+      albumIds: [] as string[],
+      topTrackIds: data.tracks.slice(0, 5).map(t => t.id),
+      velocity: `+${(Math.random() * 50).toFixed(1)}% this week`
+    }));
   }
 
   /**
-   * Get specific artist by ID or Name
+   * Get artist by ID
    */
   public static async getArtistById(artistId: string): Promise<Artist | null> {
     const artists = await this.getArtists();
-    const match = artists.find(a => a.id === artistId || a.name.toLowerCase() === artistId.toLowerCase());
-    return match || null;
+    return artists.find(a => a.id === artistId) || null;
   }
 
   /**
-   * Fetch all user-created playlists (purges legacy dummy playlists automatically)
+   * Fetch all real playlists (filters out dummy playlists)
    */
   public static async getPlaylists(): Promise<Playlist[]> {
     let local: Playlist[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
@@ -265,15 +259,14 @@ export class DatabaseService {
         const toPurge: string[] = [];
 
         snap.docs.forEach(d => {
-          const pl = { id: d.id, ...d.data() } as Playlist;
-          if (isDummyPlaylist(pl)) {
+          const playlist = { id: d.id, ...d.data() } as Playlist;
+          if (isDummyPlaylist(playlist)) {
             toPurge.push(d.id);
           } else {
-            remote.push(pl);
+            remote.push(playlist);
           }
         });
 
-        // Asynchronously purge dummy playlists from Firestore
         toPurge.forEach(id => {
           deleteDoc(doc(db!, 'playlists', id)).catch(() => {});
         });
@@ -283,13 +276,13 @@ export class DatabaseService {
       }
       return local;
     } catch (e) {
-      console.warn('Firestore fetch playlists failed, using local cache', e);
+      console.warn('Firestore fetch playlists using local cache', e);
       return local;
     }
   }
 
   /**
-   * Save or update a playlist
+   * Save or Update a Playlist
    */
   public static async savePlaylist(playlist: Playlist): Promise<void> {
     if (isDummyPlaylist(playlist)) return;
@@ -302,13 +295,13 @@ export class DatabaseService {
       try {
         await setDoc(doc(db, 'playlists', playlist.id), playlist);
       } catch (e) {
-        console.warn('Firestore save playlist failed', e);
+        console.warn('Firestore playlist sync pending/failed', e);
       }
     }
   }
 
   /**
-   * Delete a playlist
+   * Delete a Playlist
    */
   public static async deletePlaylist(playlistId: string): Promise<void> {
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
@@ -325,23 +318,22 @@ export class DatabaseService {
   }
 
   /**
-   * Add a track to a playlist
+   * Add a track to an existing playlist
    */
   public static async addTrackToPlaylist(playlistId: string, trackId: string): Promise<Playlist | null> {
     const playlists = await this.getPlaylists();
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) return null;
 
-    if (!playlist.trackIds.includes(trackId)) {
-      const updatedPlaylist: Playlist = {
-        ...playlist,
-        trackIds: [...playlist.trackIds, trackId],
-        updatedAt: Date.now()
-      };
-      await this.savePlaylist(updatedPlaylist);
-      return updatedPlaylist;
-    }
-    return playlist;
+    if (playlist.trackIds.includes(trackId)) return playlist;
+
+    const updatedPlaylist: Playlist = {
+      ...playlist,
+      trackIds: [...playlist.trackIds, trackId],
+      updatedAt: Date.now()
+    };
+    await this.savePlaylist(updatedPlaylist);
+    return updatedPlaylist;
   }
 
   /**
@@ -408,7 +400,14 @@ export class DatabaseService {
   }
 
   /**
-   * Google Sign-In via Firebase Auth
+   * Check if a login is currently in progress (to prevent race conditions with onAuthStateChanged)
+   */
+  public static isLoginInProgress(): boolean {
+    return _loginInProgress;
+  }
+
+  /**
+   * Google Sign-In via Firebase Auth (popup with redirect fallback)
    */
   public static async loginWithGoogle(): Promise<UserProfile> {
     if (!auth) {
@@ -418,31 +417,39 @@ export class DatabaseService {
       throw new Error('Firebase Auth is not initialized. Check your .env credentials.');
     }
 
+    _loginInProgress = true;
+
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const userCredential = await signInWithPopup(auth, provider);
-      const fbUser = userCredential.user;
 
-      // Construct user profile immediately
-      const existing = await this.getUserById(fbUser.uid);
-      const userProfile: UserProfile = {
-        id: fbUser.uid,
-        name: fbUser.displayName || existing?.name || 'Music Lover',
-        email: fbUser.email || existing?.email || undefined,
-        avatar: fbUser.photoURL || existing?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${fbUser.uid}`,
-        isOnboarded: existing ? existing.isOnboarded : false,
-        selectedGenres: existing ? existing.selectedGenres : [],
-        selectedVibes: existing ? existing.selectedVibes : [],
-        likedTrackIds: existing ? existing.likedTrackIds : [],
-        savedPlaylistIds: existing ? existing.savedPlaylistIds : [],
-        recentTrackIds: existing ? existing.recentTrackIds : []
-      };
+      let fbUser: FirebaseUser;
 
+      try {
+        // Try popup first
+        const userCredential = await signInWithPopup(auth, provider);
+        fbUser = userCredential.user;
+      } catch (popupErr: any) {
+        // If popup is blocked, fall back to redirect
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
+          console.warn('Popup blocked, falling back to redirect sign-in...');
+          await signInWithRedirect(auth, provider);
+          // This will redirect the page — the result is handled on page load via handleRedirectResult
+          throw new Error('REDIRECT_IN_PROGRESS');
+        }
+        throw popupErr;
+      }
+
+      // Construct user profile immediately from Firebase Auth user object
+      const userProfile = await this.buildProfileFromFirebaseUser(fbUser);
+      
       // Save to local storage & Firestore immediately
       await this.saveUserSync(userProfile);
       return userProfile;
     } catch (err: any) {
+      if (err.message === 'REDIRECT_IN_PROGRESS') {
+        throw err;
+      }
       console.error('Firebase Auth Error details:', err);
       if (err.code === 'auth/operation-not-allowed') {
         throw new Error('Google Sign-In is not enabled yet in your Firebase project. In Firebase Console, go to Authentication > Sign-in method > Enable Google.');
@@ -454,19 +461,84 @@ export class DatabaseService {
         throw new Error('Sign-in popup was closed before completing. Please try again.');
       }
       throw new Error(err.message || 'Firebase Google Sign-in failed.');
+    } finally {
+      _loginInProgress = false;
     }
+  }
+
+  /**
+   * Handle redirect result (called on page load after a redirect sign-in)
+   */
+  public static async handleRedirectResult(): Promise<UserProfile | null> {
+    if (!auth) return null;
+
+    try {
+      const result = await getRedirectResult(auth);
+      if (result && result.user) {
+        const userProfile = await this.buildProfileFromFirebaseUser(result.user);
+        await this.saveUserSync(userProfile);
+        return userProfile;
+      }
+    } catch (err: any) {
+      console.error('Redirect result error:', err);
+    }
+    return null;
+  }
+
+  /**
+   * Build a UserProfile from a Firebase Auth user, merging with existing data if available
+   */
+  private static async buildProfileFromFirebaseUser(fbUser: FirebaseUser): Promise<UserProfile> {
+    // Check local storage first (fast), then Firestore (background)
+    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    const localExisting = local.find((u: UserProfile) => u.id === fbUser.uid) || null;
+
+    // Try Firestore but don't block on it — use local if available
+    let existing = localExisting;
+    if (db) {
+      try {
+        const snap = await getDoc(doc(db, 'users', fbUser.uid));
+        if (snap.exists()) {
+          existing = { id: snap.id, ...snap.data() } as UserProfile;
+        }
+      } catch {
+        // Firestore read failed — use local cache, no big deal
+      }
+    }
+
+    return {
+      id: fbUser.uid,
+      name: fbUser.displayName || existing?.name || 'Music Lover',
+      email: fbUser.email || existing?.email || undefined,
+      avatar: fbUser.photoURL || existing?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${fbUser.uid}`,
+      isOnboarded: existing ? existing.isOnboarded : false,
+      selectedGenres: existing?.selectedGenres || [],
+      selectedVibes: existing?.selectedVibes || [],
+      likedTrackIds: existing?.likedTrackIds || [],
+      savedPlaylistIds: existing?.savedPlaylistIds || [],
+      recentTrackIds: existing?.recentTrackIds || []
+    };
   }
 
   /**
    * Demo / Guest account with instant local & Firestore persistence
    */
   public static async loginWithDemo(name = 'Dhruv'): Promise<UserProfile> {
+    // Check if there's already a guest session in localStorage to reuse
+    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    const existingGuest = local.find((u: UserProfile) => u.id.startsWith('user_guest_'));
+    
+    if (existingGuest) {
+      // Reuse existing guest profile (preserves playlists, liked tracks, etc.)
+      return existingGuest;
+    }
+
     const demoId = 'user_guest_' + Math.random().toString(36).substring(2, 7);
     const demoProfile: UserProfile = {
       id: demoId,
       name,
-      email: `${name.toLowerCase().replace(/\s+/g, '')}@spotify-cloud.local`,
-      avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80`,
+      email: `${name.toLowerCase().replace(/\s+/g, '')}@gaana-bajao.local`,
+      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${demoId}`,
       isOnboarded: true,
       selectedGenres: [],
       selectedVibes: [],
@@ -482,10 +554,12 @@ export class DatabaseService {
    * Helper to sync user profile across localStorage and Firestore
    */
   private static async saveUserSync(user: UserProfile): Promise<void> {
+    // 1. Always update localStorage FIRST (synchronous, guaranteed)
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
     const updated = [user, ...local.filter((u: UserProfile) => u.id !== user.id)];
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
 
+    // 2. Background Firestore write (best-effort)
     if (db) {
       try {
         await setDoc(doc(db, 'users', user.id), user, { merge: true });

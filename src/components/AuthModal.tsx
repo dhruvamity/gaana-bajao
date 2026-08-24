@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { 
   Music, 
-  Sparkles, 
   ShieldCheck, 
   Radio, 
   Flame, 
   Zap, 
   ArrowRight,
   AlertCircle,
-  User,
-  Info
+  User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,8 +23,25 @@ export const AuthModal: React.FC = () => {
     try {
       await loginWithGoogle();
     } catch (err: any) {
+      // Don't show error if redirect is in progress (page will navigate away)
+      if (err.message === 'REDIRECT_IN_PROGRESS') {
+        return; // Keep spinner — page is redirecting
+      }
       console.error('Google login error', err);
-      setError(err.message || 'Failed to open Google sign-in. Please check browser pop-up permissions or Firebase settings.');
+      
+      // User-friendly error messages
+      const msg = err.message || '';
+      if (msg.includes('popup') || msg.includes('Pop-up')) {
+        setError('Pop-up was blocked or closed. Please allow pop-ups for this site, then try again.');
+      } else if (msg.includes('not enabled') || msg.includes('operation-not-allowed')) {
+        setError('Google Sign-In is not enabled in Firebase Console. Go to Authentication → Sign-in method → Enable Google.');
+      } else if (msg.includes('unauthorized-domain') || msg.includes('not authorized')) {
+        setError('This domain is not authorized. Add "localhost" in Firebase Console → Authentication → Settings → Authorized Domains.');
+      } else if (msg.includes('network') || msg.includes('Network')) {
+        setError('Network error. Check your internet connection and try again.');
+      } else {
+        setError(msg || 'Failed to sign in with Google. Please try again.');
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -38,7 +53,7 @@ export const AuthModal: React.FC = () => {
     try {
       await loginWithDemo('Dhruv');
     } catch (err: any) {
-      console.error('Demo login error', err);
+      console.error('Guest login error', err);
       setError(err.message || 'Failed to initialize session.');
     } finally {
       setIsDemoLoggingIn(false);
