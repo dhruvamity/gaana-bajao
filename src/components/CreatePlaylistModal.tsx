@@ -88,15 +88,15 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-none flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-lg glass-elevated border border-white/15 rounded-lg p-6 sm:p-8 shadow-card space-y-6 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-lg bg-surface-container-high rounded-lg p-6 sm:p-8 shadow-card space-y-6 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded bg-primary/20 text-primary border border-primary/30 flex items-center justify-center">
+            <div className="w-10 h-10 rounded bg-primary/20 text-primary border border-white/10 flex items-center justify-center">
               <Plus size={20} />
             </div>
             <div>
@@ -107,7 +107,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full glass-subtle text-on-surface-variant hover:text-white transition-all"
+            className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all"
           >
             <X size={18} />
           </button>
@@ -123,7 +123,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Late Night Vibes, Workout Anthems"
-              className="w-full px-3.5 py-2.5 rounded glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
+              className="w-full px-3.5 py-2.5 rounded bg-surface-container text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
             />
           </div>
 
@@ -135,7 +135,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What makes this playlist special?"
-              className="w-full px-3.5 py-2 rounded glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary resize-none"
+              className="w-full px-3.5 py-2 rounded bg-surface-container text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary resize-none"
             />
           </div>
 
@@ -147,7 +147,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
               value={coverUrl}
               onChange={(e) => setCoverUrl(e.target.value)}
               placeholder="https://images.unsplash.com/... (or choose below)"
-              className="w-full px-3.5 py-2.5 rounded glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
+              className="w-full px-3.5 py-2.5 rounded bg-surface-container text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
             />
 
             {/* Quick Cover Palette */}
@@ -170,7 +170,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
           </div>
 
           {/* Collaborative toggle */}
-          <div className="p-3.5 rounded-lg glass-subtle space-y-3">
+          <div className="p-3.5 rounded-lg bg-white/5 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-bold text-white">Collaborative Playlist</h4>
@@ -205,7 +205,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
                         className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium border transition-all ${
                           isSelected 
                             ? 'bg-primary/20 border-primary text-white' 
-                            : 'glass-subtle border-white/10 text-on-surface-variant hover:text-white'
+                            : 'bg-white/5 border-white/10 text-on-surface-variant hover:text-white'
                         }`}
                       >
                         <CoverArt src={user.avatar} title={user.name} id={user.id} className="w-5 h-5 rounded-full object-cover" />

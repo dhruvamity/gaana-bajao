@@ -28,6 +28,12 @@ interface AudioContextType {
   
   // Actions
   playTrack: (track: Track, newQueue?: Track[]) => void;
+  /**
+   * Play `track`, or toggle play/pause when it is already the current track.
+   * Track rows render a pause icon for the playing track; wiring them straight
+   * to playTrack made that icon restart the song instead of pausing it.
+   */
+  playOrToggle: (track: Track, newQueue?: Track[]) => void;
   togglePlay: () => void;
   pause: () => void;
   resume: () => void;
@@ -232,6 +238,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsPlaying(true);
   };
 
+  const playOrToggle = (track: Track, newQueue?: Track[]) => {
+    if (currentTrack?.id === track.id) {
+      togglePlay();
+      return;
+    }
+    playTrack(track, newQueue);
+  };
+
   const togglePlay = () => {
     if (!audioEngineRef.current || !currentTrack) return;
     if (isPlaying) {
@@ -372,6 +386,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         getFrequencyData,
         enableAnalyser,
         playTrack,
+        playOrToggle,
         togglePlay,
         pause,
         resume,

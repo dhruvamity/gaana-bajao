@@ -111,7 +111,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search playlists..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface-container text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
           />
         </div>
 
@@ -122,7 +122,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
             className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               filterType === 'all'
                 ? 'bg-primary text-on-primary shadow-sm font-bold'
-                : 'glass-subtle text-on-surface-variant hover:text-white'
+                : 'bg-white/5 text-on-surface-variant hover:text-white'
             }`}
           >
             All ({playlists.length})
@@ -132,7 +132,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
             className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               filterType === 'created'
                 ? 'bg-primary text-on-primary shadow-sm font-bold'
-                : 'glass-subtle text-on-surface-variant hover:text-white'
+                : 'bg-white/5 text-on-surface-variant hover:text-white'
             }`}
           >
             By You
@@ -142,7 +142,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
             className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               filterType === 'collaborative'
                 ? 'bg-primary text-on-primary shadow-sm font-bold'
-                : 'glass-subtle text-on-surface-variant hover:text-white'
+                : 'bg-white/5 text-on-surface-variant hover:text-white'
             }`}
           >
             Collaborative
@@ -152,7 +152,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
 
       {/* Playlists Grid */}
       {filteredPlaylists.length === 0 ? (
-        <div className="p-16 text-center rounded-lg glass-subtle border border-white/5 space-y-3">
+        <div className="p-16 text-center rounded-lg bg-white/5 border border-white/5 space-y-3">
           <Music size={40} className="mx-auto text-on-surface-variant opacity-40" />
           <h3 className="text-base font-bold text-white">No playlists found</h3>
           <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
@@ -175,7 +175,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
               <div
                 key={playlist.id}
                 onClick={() => onSelectPlaylist(playlist)}
-                className="group relative p-4 rounded-lg glass-panel border border-white/5 hover:border-primary/30 hover:bg-white/5 transition-all duration-300 flex flex-col justify-between cursor-pointer"
+                className="group relative p-4 rounded-lg bg-surface-container hover:border-primary/30 hover:bg-white/5 transition-all duration-300 flex flex-col justify-between cursor-pointer"
               >
                 {/* Artwork with Hover Play Button */}
                 <div className="relative aspect-square w-full rounded-lg overflow-hidden mb-3 shadow-lg group">
@@ -199,11 +199,11 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
                   {/* Algorithmic or Collaborative Badge */}
                   <div className="absolute top-2.5 left-2.5">
                     {playlist.isAlgorithmic ? (
-                      <span className="glass-pill px-2 py-0.5 rounded text-[10px] font-bold text-primary flex items-center gap-1">
+                      <span className="bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold text-primary flex items-center gap-1">
                         <Sparkles size={10} /> Curated
                       </span>
                     ) : playlist.collaborators && playlist.collaborators.length > 0 ? (
-                      <span className="glass-pill px-2 py-0.5 rounded text-[10px] font-bold text-tertiary flex items-center gap-1">
+                      <span className="bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold text-tertiary flex items-center gap-1">
                         <Users size={10} /> Shared
                       </span>
                     ) : null}
@@ -213,7 +213,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
                   {!playlist.isAlgorithmic && isOwner && (
                     <button
                       onClick={(e) => handleDeletePlaylist(e, playlist.id)}
-                      className="absolute top-2.5 right-2.5 p-1.5 rounded-full glass-subtle text-on-surface-variant hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/5 text-on-surface-variant hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                       title="Delete Playlist"
                     >
                       <Trash2 size={14} />

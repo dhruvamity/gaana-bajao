@@ -83,8 +83,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-none">
-      <div className="relative w-full max-w-lg p-6 sm:p-8 rounded-lg bg-surface-container border border-white/10 shadow-card space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+      <div className="relative w-full max-w-lg p-6 sm:p-8 rounded-lg bg-surface-container-high shadow-card space-y-6">
         
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -109,7 +109,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 title={currentUser.name}
                 id={currentUser.id}
                 loading="eager"
-                className="w-20 h-20 rounded-lg object-cover border-2 border-primary/40 shadow-lg "
+                className="w-20 h-20 rounded-lg object-cover border-2 border-white/20 shadow-lg "
               />
               <label 
                 className="absolute inset-0 bg-black/60 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
@@ -162,7 +162,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                  className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                   required
                 />
               </div>
@@ -173,7 +173,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Tell us about your music taste..."
-                  className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                  className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-1">
@@ -237,7 +237,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               onClose();
               setIsOnboardingOpen(true);
             }}
-            className="px-3.5 py-1.5 rounded text-xs font-bold text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+            className="px-3.5 py-1.5 rounded text-xs font-bold text-primary hover:bg-primary/10 border border-white/10 transition-colors"
           >
             Update
           </button>

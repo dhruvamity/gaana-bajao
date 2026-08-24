@@ -367,8 +367,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const effectiveCover = getEffectiveCoverPreview();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-none overflow-y-auto">
-      <div className="relative w-full max-w-2xl max-h-[90vh] my-auto flex flex-col rounded-lg bg-surface-container border border-white/10 shadow-card overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 overflow-y-auto">
+      <div className="relative w-full max-w-2xl max-h-[90vh] my-auto flex flex-col rounded-lg bg-surface-container-high shadow-card overflow-hidden">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 bg-surface-container-high/40">
@@ -650,7 +650,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <select
                     value={selectedPlaylistId}
                     onChange={(e) => setSelectedPlaylistId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                    className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                   >
                     {existingPlaylists.map(pl => (
                       <option key={pl.id} value={pl.id} className="bg-surface-container text-white">
@@ -677,7 +677,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     value={newPlaylistTitle}
                     onChange={(e) => setNewPlaylistTitle(e.target.value)}
                     placeholder="e.g. Road Trip Bangers"
-                    className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                    className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                     required={playlistMode === 'new'}
                   />
                 </div>
@@ -690,7 +690,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     value={newPlaylistDescription}
                     onChange={(e) => setNewPlaylistDescription(e.target.value)}
                     placeholder="A brief description of this collection..."
-                    className="w-full px-3.5 py-2.5 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                    className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>

@@ -98,12 +98,12 @@ export const TasteOnboarding: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-none flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl glass-elevated border border-white/20 rounded-lg p-6 sm:p-10 shadow-card space-y-8 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-surface-container-high rounded-lg p-6 sm:p-10 shadow-card space-y-8 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 text-xs font-bold uppercase tracking-wider mb-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-white/10 text-xs font-bold uppercase tracking-wider mb-1">
             <Sparkles size={13} />
             Taste Profile Vector
           </div>
@@ -183,7 +183,7 @@ export const TasteOnboarding: React.FC = () => {
             <select
               value={customTagType}
               onChange={(e) => setCustomTagType(e.target.value as any)}
-              className="px-3 py-2 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+              className="px-3 py-2 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
             >
               <option value="genre">Genre</option>
               <option value="vibe">Mood / Vibe</option>
@@ -194,7 +194,7 @@ export const TasteOnboarding: React.FC = () => {
               value={customTagInput}
               onChange={(e) => setCustomTagInput(e.target.value)}
               placeholder="e.g. Progressive Metal, Coding Chill..."
-              className="flex-1 px-3.5 py-2 rounded bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+              className="flex-1 px-3.5 py-2 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
             />
 
             <button

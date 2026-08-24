@@ -55,7 +55,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
   onSelectArtist,
   onOpenAddToPlaylist
 }) => {
-  const { playTrack, currentTrack, isPlaying, logInteraction } = useAudio();
+  const { playTrack, playOrToggle, currentTrack, isPlaying, logInteraction } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
 
   const searchQuery = query;
@@ -160,7 +160,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
               value={searchQuery}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Search songs, artists, or moods (e.g. 'late night focus')..."
-              className="w-full pl-11 pr-11 py-3 rounded-lg glass-elevated border border-white/15 text-white placeholder-on-surface-variant text-xs sm:text-sm focus:outline-none focus:border-primary/60 transition-all"
+              className="w-full pl-11 pr-11 py-3 rounded-lg bg-surface-container-high text-white placeholder-on-surface-variant text-xs sm:text-sm focus:outline-none focus:border-primary/60 transition-all"
             />
             {isAiProcessing && (
               <Sparkles size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-primary animate-spin" />
@@ -169,7 +169,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
 
           <button
             onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-            className={`p-3 rounded-lg glass-pill transition-all ${
+            className={`p-3 rounded-lg bg-white/10 hover:bg-white/20 transition-all ${
               isFiltersOpen ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white'
             }`}
             title="Audio Filters"
@@ -188,7 +188,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
               <button
                 key={prompt}
                 onClick={() => handlePromptClick(prompt)}
-                className="px-3 py-1.5 rounded glass-pill border border-white/10 text-xs text-on-surface-variant hover:text-white hover:border-primary/40 transition-all"
+                className="px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 border border-white/10 text-xs text-on-surface-variant hover:text-white hover:border-white/20 transition-all"
               >
                 {prompt}
               </button>
@@ -198,7 +198,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
 
         {/* Advanced Acoustic Filters Tray */}
         {isFiltersOpen && (
-          <div className="p-4 rounded-lg glass-panel border border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+          <div className="p-4 rounded-lg bg-surface-container space-y-4 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center justify-between text-xs font-bold text-white">
               <span className="flex items-center gap-1.5"><Activity size={14} className="text-primary" /> Minimum Acoustic Energy</span>
               <span>{Math.round(minEnergy * 100)}%</span>
@@ -268,7 +268,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
         </div>
 
         {filteredTracks.length === 0 ? (
-          <div className="p-12 text-center rounded-lg glass-panel border border-white/5 space-y-2">
+          <div className="p-12 text-center rounded-lg bg-surface-container space-y-2">
             <Music size={32} className="mx-auto text-on-surface-variant opacity-40" />
             <p className="text-sm font-semibold text-white">No matching tracks found</p>
             <p className="text-xs text-on-surface-variant">Try searching for a different song, artist, or genre.</p>
@@ -282,7 +282,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
               return (
                 <div
                   key={track.id}
-                  className={`group p-3 sm:px-4 sm:py-3 rounded-lg glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
+                  className={`group p-3 sm:px-4 sm:py-3 rounded-lg bg-surface-container border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
                     isTrackActive ? 'border-primary/50 bg-primary/10' : 'border-white/5'
                   }`}
                 >
@@ -294,7 +294,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                     <div className="relative w-12 h-12 rounded overflow-hidden shadow-md flex-shrink-0">
                       <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                       <button
-                        onClick={() => playTrack(track, filteredTracks)}
+                        onClick={() => playOrToggle(track, filteredTracks)}
                         className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       >
                         {isTrackActive && isPlaying ? (
@@ -319,7 +319,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                   </div>
 
                   <div className="hidden sm:flex items-center gap-4 text-xs text-on-surface-variant">
-                    <span className="glass-pill px-2.5 py-1 rounded-full text-[11px] text-white/80">{track.genre}</span>
+                    <span className="bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-full text-[11px] text-white/80">{track.genre}</span>
                     <span className="flex items-center gap-1 text-primary"><Activity size={12} /> {track.acoustics?.tempo || 120} BPM</span>
                     <span className="flex items-center gap-1"><Clock size={12} /> {formatDuration(track.duration)}</span>
                   </div>
@@ -346,8 +346,8 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                       <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                     </button>
                     <button
-                      onClick={() => playTrack(track, filteredTracks)}
-                      className="p-2 rounded glass-pill text-primary hover:bg-primary/20 transition-all cursor-pointer"
+                      onClick={() => playOrToggle(track, filteredTracks)}
+                      className="p-2 rounded bg-white/10 hover:bg-white/20 text-primary hover:bg-primary/20 transition-all cursor-pointer"
                     >
                       {isTrackActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
                     </button>

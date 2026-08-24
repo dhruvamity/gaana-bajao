@@ -51,15 +51,15 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-none flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-md glass-elevated border border-white/15 rounded-lg p-6 shadow-card space-y-6 max-h-[85vh] overflow-y-auto"
+        className="w-full max-w-md bg-surface-container-high rounded-lg p-6 shadow-card space-y-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded bg-primary/20 text-primary border border-primary/30 flex items-center justify-center">
+            <div className="w-10 h-10 rounded bg-primary/20 text-primary border border-white/10 flex items-center justify-center">
               <FolderPlus size={20} />
             </div>
             <div>
@@ -72,7 +72,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full glass-subtle text-on-surface-variant hover:text-white transition-all"
+            className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all"
           >
             <X size={18} />
           </button>
@@ -84,7 +84,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
             onClose();
             if (onOpenCreatePlaylist) onOpenCreatePlaylist();
           }}
-          className="w-full p-3 rounded-lg bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary font-bold text-xs flex items-center justify-center gap-2 transition-all hover:scale-102"
+          className="w-full p-3 rounded-lg bg-primary/15 hover:bg-primary/25 border border-white/10 text-primary font-bold text-xs flex items-center justify-center gap-2 transition-all hover:scale-102"
         >
           <Plus size={16} />
           <span>New Playlist with this Track</span>
@@ -99,7 +99,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
           {loading ? (
             <div className="py-8 text-center text-xs text-on-surface-variant">Loading playlists...</div>
           ) : playlists.length === 0 ? (
-            <div className="py-8 text-center glass-subtle rounded-lg text-xs text-on-surface-variant">
+            <div className="py-8 text-center bg-white/5 rounded-lg text-xs text-on-surface-variant">
               No playlists found. Create one above!
             </div>
           ) : (
@@ -113,8 +113,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                     onClick={() => handleToggleTrackInPlaylist(playlist)}
                     className={`w-full p-2.5 rounded border flex items-center justify-between transition-all group ${
                       isSelected
-                        ? 'bg-primary/20 border-primary/40 text-white'
-                        : 'glass-panel border-white/5 hover:border-primary/30 text-on-surface-variant hover:text-white'
+                        ? 'bg-primary/20 border-white/20 text-white'
+                        : 'bg-surface-container border-white/5 hover:border-primary/30 text-on-surface-variant hover:text-white'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">

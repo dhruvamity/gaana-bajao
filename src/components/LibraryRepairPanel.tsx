@@ -105,7 +105,7 @@ export const LibraryRepairPanel: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="p-3.5 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary font-medium flex items-start gap-2">
+      <div className="p-3.5 rounded-lg bg-primary/10 border border-white/10 text-xs text-primary font-medium flex items-start gap-2">
         <Wand2 size={16} className="flex-shrink-0 mt-0.5" />
         <span>
           Re-reads the ID3 tags inside your uploaded audio files to recover album art, titles and
@@ -289,7 +289,7 @@ export const LibraryRepairPanel: React.FC = () => {
           type="button"
           onClick={handleScan}
           disabled={busy}
-          className="px-4 py-2 rounded glass-subtle text-xs font-bold text-white hover:bg-white/10 disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+          className="px-4 py-2 rounded bg-white/5 text-xs font-bold text-white hover:bg-white/10 disabled:opacity-40 flex items-center gap-1.5 transition-colors"
         >
           {phase === 'scanning' ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           <span>{scan ? 'Rescan library' : 'Scan library'}</span>

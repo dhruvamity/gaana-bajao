@@ -92,15 +92,15 @@ export const ConnectMenu: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-none flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-lg glass-elevated border border-white/15 rounded-t-3xl sm:rounded-lg p-6 shadow-card space-y-6 max-h-[85vh] overflow-y-auto"
+        className="w-full max-w-lg bg-surface-container-high rounded-t-3xl sm:rounded-lg p-6 shadow-card space-y-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded bg-primary/20 border border-primary/40 flex items-center justify-center text-primary">
+            <div className="w-10 h-10 rounded bg-primary/20 border border-white/20 flex items-center justify-center text-primary">
               <Cast size={20} />
             </div>
             <div>
@@ -111,14 +111,14 @@ export const ConnectMenu: React.FC = () => {
 
           <button
             onClick={() => setIsConnectOpen(false)}
-            className="p-2 rounded-full glass-subtle text-on-surface-variant hover:text-white transition-all"
+            className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Listen Together Room Sync Toggle */}
-        <div className="p-4 rounded-lg glass-panel border border-primary/20 flex items-center justify-between gap-4">
+        <div className="p-4 rounded-lg bg-surface-container border border-white/10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded bg-tertiary/20 text-tertiary border border-tertiary/30">
               <Users size={18} />
@@ -152,7 +152,7 @@ export const ConnectMenu: React.FC = () => {
             return (
               <div
                 key={device.id}
-                className="p-4 rounded-lg bg-primary/10 border border-primary/40 flex items-center justify-between"
+                className="p-4 rounded-lg bg-primary/10 border border-white/20 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="p-3 rounded bg-primary text-on-primary shadow-lg ">
@@ -199,10 +199,10 @@ export const ConnectMenu: React.FC = () => {
                 <button
                   key={device.id}
                   onClick={() => handleSelectDevice(device)}
-                  className="w-full p-3.5 rounded-lg glass-panel border border-white/5 hover:border-primary/40 hover:bg-white/5 flex items-center justify-between text-left transition-all group"
+                  className="w-full p-3.5 rounded-lg bg-surface-container hover:border-white/20 hover:bg-white/5 flex items-center justify-between text-left transition-all group"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="p-2.5 rounded glass-subtle text-on-surface-variant group-hover:text-primary transition-colors">
+                    <div className="p-2.5 rounded bg-white/5 text-on-surface-variant group-hover:text-primary transition-colors">
                       <Icon size={18} />
                     </div>
                     <div>
