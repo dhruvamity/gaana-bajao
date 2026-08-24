@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Wand2, Search, AlertCircle, Check, Image as ImageIcon, Tag, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Wand2, Search, AlertCircle, Check, Image as ImageIcon, Tag, Loader2, ShieldCheck, Info } from 'lucide-react';
 import {
   scanLibrary,
   repairLibrary,
@@ -14,7 +15,41 @@ import {
  * Scanning is read-only and always runs first, so the result of a repair is
  * visible before anything is written.
  */
+/** Plain-language explanation for each scan outcome. */
+const DIAGNOSIS_COPY: Record<string, { label: string; detail: string; tone: 'good' | 'warn' | 'bad' }> = {
+  'artwork-available': {
+    label: 'Embedded artwork found',
+    detail: 'The file contains cover art that is not yet in your library. Repair will restore it.',
+    tone: 'good'
+  },
+  'tags-no-artwork': {
+    label: 'No cover art inside the file',
+    detail:
+      'The file has a tag container but no embedded picture, so there is no artwork to extract. ' +
+      'A cover generated from the track name is used instead.',
+    tone: 'warn'
+  },
+  'stripped-on-host': {
+    label: 'No tags in the stored file',
+    detail:
+      'The audio is valid but carries no ID3 tag. The original file may never have had one, or the metadata was ' +
+      'removed when the file was uploaded. Re-uploading the tagged original is the only way to recover it.',
+    tone: 'bad'
+  },
+  'unreadable': {
+    label: 'Could not read the file',
+    detail: 'The audio could not be fetched or parsed. Usually a CORS restriction or an expired media URL.',
+    tone: 'bad'
+  },
+  'already-correct': {
+    label: 'Already correct',
+    detail: 'This track already has the artwork and metadata its file contains.',
+    tone: 'good'
+  }
+};
+
 export const LibraryRepairPanel: React.FC = () => {
+  const { currentUser } = useAuth();
   const [phase, setPhase] = useState<'idle' | 'scanning' | 'scanned' | 'repairing' | 'done'>('idle');
   const [progress, setProgress] = useState<{ done: number; total: number; label?: string }>({ done: 0, total: 0 });
   const [scan, setScan] = useState<ScanSummary | null>(null);
@@ -23,6 +58,7 @@ export const LibraryRepairPanel: React.FC = () => {
 
   const [restoreArtwork, setRestoreArtwork] = useState(true);
   const [restoreMetadata, setRestoreMetadata] = useState(true);
+  const [claimOwnership, setClaimOwnership] = useState(true);
 
   const handleScan = async () => {
     setPhase('scanning');
@@ -46,7 +82,14 @@ export const LibraryRepairPanel: React.FC = () => {
     try {
       const summary = await repairLibrary(
         scan,
-        { restoreArtwork, restoreMetadata },
+        {
+          restoreArtwork,
+          restoreMetadata,
+          claimOwnership:
+            claimOwnership && currentUser
+              ? { userId: currentUser.id, userName: currentUser.name }
+              : undefined
+        },
         (done, total, label) => setProgress({ done, total, label })
       );
       setRepair(summary);
@@ -113,14 +156,39 @@ export const LibraryRepairPanel: React.FC = () => {
             ))}
           </div>
 
+          {/* Why each track produced the result it did */}
+          <div className="space-y-1.5">
+            {Object.entries(scan.byDiagnosis)
+              .filter(([, count]) => count > 0)
+              .map(([key, count]) => {
+                const copy = DIAGNOSIS_COPY[key];
+                if (!copy) return null;
+                const tone =
+                  copy.tone === 'good' ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10'
+                  : copy.tone === 'warn' ? 'text-amber-300 border-amber-500/25 bg-amber-500/10'
+                  : 'text-error border-error/25 bg-error/10';
+                const example = scan.results.find(r => r.diagnosis === key && (r.detail || r.error));
+                return (
+                  <div key={key} className={`p-3 rounded-xl border text-[11px] leading-relaxed ${tone}`}>
+                    <div className="font-bold flex items-center gap-1.5">
+                      <Info size={12} />
+                      <span>{count} {count === 1 ? 'track' : 'tracks'} &mdash; {copy.label}</span>
+                    </div>
+                    <p className="opacity-80 mt-0.5">{copy.detail}</p>
+                    {example && (example.error || example.detail) && (
+                      <p className="opacity-60 mt-1 font-mono text-[10px] break-all">
+                        e.g. {example.currentTitle}: {example.error || example.detail}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
           {scan.repairable === 0 ? (
             <div className="p-4 rounded-xl bg-surface-container-high/40 border border-white/5 text-xs text-on-surface-variant leading-relaxed">
-              <p className="font-bold text-white mb-1">Nothing to recover.</p>
-              <p>
-                {scan.withEmbeddedArt === 0 && scan.withTags === 0
-                  ? 'None of your audio files carry ID3 tags or embedded artwork — there is no artwork stored inside them to extract. Tracks without artwork now show a cover generated from the track name, so each one is still visually distinct.'
-                  : 'Every track already has the artwork and metadata its file contains.'}
-              </p>
+              <p className="font-bold text-white mb-1">Nothing to repair.</p>
+              <p>See the breakdown above for why. Tracks with no embedded artwork show a cover generated from the track name, so each stays visually distinct.</p>
             </div>
           ) : (
             <>
@@ -155,6 +223,23 @@ export const LibraryRepairPanel: React.FC = () => {
                     </span>
                   </span>
                 </label>
+                {scan.missingOwner > 0 && currentUser && (
+                  <label className="flex items-center gap-2.5 text-xs text-white cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={claimOwnership}
+                      onChange={e => setClaimOwnership(e.target.checked)}
+                      className="accent-primary w-4 h-4"
+                    />
+                    <ShieldCheck size={14} className="text-primary" />
+                    <span>
+                      Claim ownership of pre-existing tracks{' '}
+                      <span className="text-on-surface-variant">
+                        ({scan.missingOwner} tracks) &mdash; required before security rules are enforced
+                      </span>
+                    </span>
+                  </label>
+                )}
               </div>
 
               {/* Preview of proposed metadata changes */}
@@ -191,7 +276,8 @@ export const LibraryRepairPanel: React.FC = () => {
           </div>
           <p>
             {repair.artworkRestored} cover{repair.artworkRestored === 1 ? '' : 's'} restored,{' '}
-            {repair.metadataRestored} track{repair.metadataRestored === 1 ? '' : 's'} retagged.
+            {repair.metadataRestored} track{repair.metadataRestored === 1 ? '' : 's'} retagged
+            {repair.ownershipClaimed > 0 && `, ${repair.ownershipClaimed} claimed`}.
             {repair.failed.length > 0 && ` ${repair.failed.length} failed.`}
           </p>
           <p className="text-emerald-300/70">Reload to see the updated library.</p>
