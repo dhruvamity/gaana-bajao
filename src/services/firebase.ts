@@ -25,6 +25,7 @@ import {
   User as FirebaseUser 
 } from 'firebase/auth';
 import { Track, Playlist, UserProfile, TelemetryEvent, DeviceSession, Artist } from '../types';
+import { slugifyArtistId } from '../utils/artistId';
 
 // Default / fallback local storage keys
 const STORAGE_KEYS = {
@@ -162,7 +163,7 @@ export class DatabaseService {
     }>();
 
     tracks.forEach(track => {
-      const artistId = 'artist_' + track.artist.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const artistId = slugifyArtistId(track.artist);
       if (!artistMap.has(artistId)) {
         artistMap.set(artistId, {
           name: track.artist,

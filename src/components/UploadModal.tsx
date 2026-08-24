@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   UploadCloud, 
   X, 
@@ -18,6 +18,7 @@ import { StorageService } from '../services/storageService';
 import { DatabaseService } from '../services/firebase';
 import { extractAudioMetadata, ExtractedMetadata } from '../services/metadataService';
 import { useAuth } from '../context/AuthContext';
+import { slugifyArtistId } from '../utils/artistId';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -69,6 +70,27 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [overallProgress, setOverallProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [successCount, setSuccessCount] = useState<number | null>(null);
+
+  // Object URLs created for artwork previews must be revoked explicitly or the
+  // underlying image blobs stay pinned in memory for the page's lifetime.
+  const revokePreview = (url?: string | null) => {
+    if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+  };
+
+  // Track every preview URL created, so unmount can release them all.
+  const previewUrlsRef = useRef<Set<string>>(new Set());
+  const trackPreview = (url?: string | null) => {
+    if (url && url.startsWith('blob:')) previewUrlsRef.current.add(url);
+    return url;
+  };
+
+  useEffect(() => {
+    const urls = previewUrlsRef.current;
+    return () => {
+      urls.forEach(url => URL.revokeObjectURL(url));
+      urls.clear();
+    };
+  }, []);
 
   // Load existing user playlists on open
   useEffect(() => {
@@ -160,7 +182,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               genre: updatedGenre,
               duration: updatedDuration,
               acoustics: analysis.acoustics,
-              coverDataUrl: metadata.coverDataUrl,
+              coverDataUrl: trackPreview(metadata.coverDataUrl) ?? null,
               coverBlob: metadata.coverBlob,
               isAnalyzing: false
             };
@@ -179,11 +201,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     setCoverFile(file);
-    setCoverPreviewUrl(URL.createObjectURL(file));
+    setCoverPreviewUrl(prev => {
+      revokePreview(prev);
+      return trackPreview(URL.createObjectURL(file)) as string;
+    });
   };
 
   const handleRemoveQueued = (id: string) => {
-    setQueue(prev => prev.filter(item => item.id !== id));
+    setQueue(prev => {
+      const removed = prev.find(item => item.id === id);
+      revokePreview(removed?.coverDataUrl);
+      previewUrlsRef.current.delete(removed?.coverDataUrl ?? '');
+      return prev.filter(item => item.id !== id);
+    });
   };
 
   const handleUpdateQueuedItem = (id: string, field: 'title' | 'artist' | 'album' | 'genre', value: string) => {
@@ -239,12 +269,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           // Upload the embedded cover art to Cloudinary
           trackCoverUrl = await StorageService.saveImageBlob(`cover_${trackId}`, item.coverBlob);
         }
-        if (!trackCoverUrl) {
-          // Fallback: generate a color-based placeholder via Cloudinary text overlay
-          trackCoverUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80`;
-        }
+        // No embedded artwork and no manual cover: leave this empty. The UI
+        // generates a cover unique to the track, which keeps a library of
+        // untagged files visually distinguishable instead of assigning every
+        // track the same stock photo.
 
-        const artistKey = item.artist.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         
         // Use per-track genre if set, otherwise global, otherwise fallback
         const trackGenre = item.genre || globalGenre || 'Music';
@@ -253,7 +282,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           id: trackId,
           title: item.title.trim() || 'Untitled Track',
           artist: item.artist.trim() || currentUser.name,
-          artistId: 'artist_' + artistKey,
+          artistId: slugifyArtistId(item.artist.trim() || currentUser.name),
           album: item.album.trim() || 'Single',
           duration: item.duration || 180,
           audioUrl: finalAudioUrl,
@@ -287,9 +316,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         }
       } else if (playlistMode === 'new' && newPlaylistTitle.trim()) {
         // Use the first track's cover as playlist cover
-        const playlistCover = globalCoverUrl 
-          || uploadedTracks[0]?.coverUrl 
-          || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80';
+        const playlistCover = globalCoverUrl || uploadedTracks[0]?.coverUrl || '';
 
         const newPlaylist: Playlist = {
           id: `pl_${Date.now()}`,
