@@ -3,6 +3,7 @@ import { X, Plus, Music, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { Playlist, UserProfile } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { DatabaseService } from '../services/firebase';
+import { CoverArt } from './CoverArt';
 
 interface CreatePlaylistModalProps {
   isOpen: boolean;
@@ -49,7 +50,9 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 
     setIsSaving(true);
 
-    const chosenCover = coverUrl.trim() || defaultCovers[Math.floor(Math.random() * defaultCovers.length)];
+    // Empty means "generate a cover from the playlist identity" — deterministic
+    // and unique, rather than one of five stock images shared across playlists.
+    const chosenCover = coverUrl.trim();
     const collaborators = isCollaborative 
       ? availableUsers.filter(u => u.id === currentUser.id || selectedCollaboratorIds.includes(u.id)).map(u => ({
           id: u.id,
@@ -205,7 +208,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
                             : 'glass-subtle border-white/10 text-on-surface-variant hover:text-white'
                         }`}
                       >
-                        <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full object-cover" />
+                        <CoverArt src={user.avatar} title={user.name} id={user.id} className="w-5 h-5 rounded-full object-cover" />
                         <span>{user.name}</span>
                       </button>
                     );

@@ -14,6 +14,7 @@ import { Playlist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAudio } from '../context/AudioContext';
+import { CoverArt } from './CoverArt';
 
 interface PlaylistsDirectoryViewProps {
   onSelectPlaylist: (playlist: Playlist) => void;
@@ -178,9 +179,11 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
               >
                 {/* Artwork with Hover Play Button */}
                 <div className="relative aspect-square w-full rounded-2xl overflow-hidden mb-3 shadow-lg group">
-                  <img
+                  <CoverArt
                     src={playlist.coverUrl}
-                    alt={playlist.title}
+                    title={playlist.title}
+                    artist={playlist.ownerName}
+                    id={playlist.id}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -238,10 +241,11 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
                     {playlist.collaborators && (
                       <div className="flex items-center -space-x-1.5">
                         {playlist.collaborators.slice(0, 3).map((c) => (
-                          <img
+                          <CoverArt
                             key={c.id}
                             src={c.avatar}
-                            alt={c.name}
+                            title={c.name}
+                            id={c.id}
                             className="w-4 h-4 rounded-full object-cover ring-1 ring-background"
                           />
                         ))}

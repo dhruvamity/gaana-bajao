@@ -19,6 +19,7 @@ import { Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
+import { CoverArt } from './CoverArt';
 
 interface SearchExploreViewProps {
   onSelectArtist?: (artistId: string) => void;
@@ -286,7 +287,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                     </span>
 
                     <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
-                      <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+                      <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                       <button
                         onClick={() => playTrack(track, filteredTracks)}
                         className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"

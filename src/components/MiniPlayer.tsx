@@ -21,6 +21,7 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { Track } from '../types';
+import { CoverArt } from './CoverArt';
 
 interface MiniPlayerProps {
   onSelectArtist?: (artistId: string) => void;
@@ -94,9 +95,12 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           onClick={() => setIsNowPlayingOpen(true)}
           className="relative w-14 h-14 rounded-xl overflow-hidden shadow-lg flex-shrink-0 cursor-pointer group ring-1 ring-white/10"
         >
-          <img 
-            src={currentTrack.coverUrl} 
-            alt={currentTrack.title} 
+          <CoverArt
+            src={currentTrack.coverUrl}
+            title={currentTrack.title}
+            artist={currentTrack.artist}
+            id={currentTrack.id}
+            loading="eager"
             className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-105' : 'scale-100'}`}
           />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

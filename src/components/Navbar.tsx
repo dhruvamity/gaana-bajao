@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAudio } from '../context/AudioContext';
+import { CoverArt } from './CoverArt';
 
 interface NavbarProps {
   currentView: string;
@@ -146,9 +147,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2 p-1 pr-2 rounded-full bg-surface-container hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
               title="Account"
             >
-              <img
+              <CoverArt
                 src={currentUser.avatar}
-                alt={currentUser.name}
+                title={currentUser.name}
+                id={currentUser.id}
+                loading="eager"
                 className="w-7 h-7 rounded-full object-cover ring-1 ring-primary/50"
               />
               <span className="text-xs font-bold text-white hidden md:inline">{currentUser.name}</span>

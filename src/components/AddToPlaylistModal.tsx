@@ -3,6 +3,7 @@ import { X, Plus, Check, Music, FolderPlus } from 'lucide-react';
 import { Playlist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
+import { CoverArt } from './CoverArt';
 
 interface AddToPlaylistModalProps {
   isOpen: boolean;
@@ -117,9 +118,11 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <img
+                      <CoverArt
                         src={playlist.coverUrl}
-                        alt={playlist.title}
+                        title={playlist.title}
+                        artist={playlist.ownerName}
+                        id={playlist.id}
                         className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                       />
                       <div className="text-left min-w-0">

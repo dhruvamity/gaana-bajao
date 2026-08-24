@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { StorageService } from '../services/storageService';
+import { CoverArt } from './CoverArt';
 
 interface UserManagementModalProps {
   isOpen: boolean;
@@ -103,9 +104,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         <div className="p-6 rounded-2xl bg-surface-container-high/80 border border-white/5 space-y-6">
           <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
             <div className="relative group">
-              <img
+              <CoverArt
                 src={currentUser.avatar}
-                alt={currentUser.name}
+                title={currentUser.name}
+                id={currentUser.id}
+                loading="eager"
                 className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/40 shadow-lg shadow-primary/20"
               />
               <label 

@@ -57,7 +57,7 @@ const MainAppContent: React.FC = () => {
       id: 'pl-liked-collection',
       title: 'Liked Songs',
       description: `Your personal library of saved favorites (${currentUser.likedTrackIds?.length || 0} tracks)`,
-      coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80',
+      coverUrl: '',
       trackIds: currentUser.likedTrackIds || [],
       ownerId: currentUser.id,
       ownerName: currentUser.name,

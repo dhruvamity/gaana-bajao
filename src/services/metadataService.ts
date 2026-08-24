@@ -25,6 +25,21 @@ export interface ExtractedMetadata {
  * Gracefully returns partial data — fields that can't be read are returned as null.
  */
 export function extractAudioMetadata(file: File): Promise<ExtractedMetadata> {
+  return readTags(file);
+}
+
+/**
+ * Extract metadata from an already-uploaded audio URL.
+ *
+ * jsmediatags reads remote sources with HTTP range requests, so this pulls only
+ * the leading bytes containing the ID3 tag rather than the whole audio file —
+ * which makes it viable to rescan an entire library.
+ */
+export function extractAudioMetadataFromUrl(url: string): Promise<ExtractedMetadata> {
+  return readTags(url);
+}
+
+function readTags(source: File | string): Promise<ExtractedMetadata> {
   return new Promise((resolve) => {
     const result: ExtractedMetadata = {
       title: null,
@@ -38,7 +53,7 @@ export function extractAudioMetadata(file: File): Promise<ExtractedMetadata> {
       coverBlob: null
     };
 
-    jsmediatags.read(file, {
+    jsmediatags.read(source, {
       onSuccess: async (tag) => {
         const tags = tag.tags;
 
@@ -56,28 +71,19 @@ export function extractAudioMetadata(file: File): Promise<ExtractedMetadata> {
         if (tags.picture) {
           try {
             const { data, format } = tags.picture;
-            let base64String = '';
-            for (let i = 0; i < data.length; i++) {
-              base64String += String.fromCharCode(data[i]);
-            }
-            
-            const base64 = btoa(base64String);
-            const dataUrl = `data:${format};base64,${base64}`;
-            
-            // Create a Blob from the base64 string
-            const byteCharacters = atob(base64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            
-            // Explicitly pass a valid file extension to the blob for Cloudinary compatibility
-            const extension = format.split('/')[1] || 'jpeg';
-            const blob = new File([byteArray], `cover.${extension}`, { type: format });
-            
-            result.coverBlob = blob;
-            result.coverDataUrl = dataUrl;
+
+            // Bytes straight to a typed array — no base64 round trip. Cover art
+            // is routinely several megabytes, and the previous
+            // bytes -> binary string -> btoa -> atob -> bytes path allocated
+            // roughly four copies of it per file.
+            const byteArray = new Uint8Array(data.length);
+            for (let i = 0; i < data.length; i++) byteArray[i] = data[i];
+
+            const mime = normaliseImageMime(format);
+            const extension = mime.split('/')[1] || 'jpeg';
+            // A real filename keeps Cloudinary's format detection happy.
+            result.coverBlob = new File([byteArray], `cover.${extension}`, { type: mime });
+            result.coverDataUrl = URL.createObjectURL(result.coverBlob);
           } catch (e) {
             console.warn('Failed to parse picture data', e);
           }
@@ -86,9 +92,23 @@ export function extractAudioMetadata(file: File): Promise<ExtractedMetadata> {
         resolve(result);
       },
       onError: (error) => {
-        console.warn('Metadata extraction partial/failed for:', file.name, error.info);
+        const label = typeof source === 'string' ? source : source.name;
+        console.warn('Metadata extraction partial/failed for:', label, error?.info);
         resolve(result); // Return whatever we have — nulls are fine
       }
     });
   });
+}
+
+/**
+ * ID3 picture frames carry a MIME type that is not always a well-formed one:
+ * ID3v2.2 uses a bare format code ("JPG"/"PNG"), and some taggers write junk.
+ */
+function normaliseImageMime(format?: string): string {
+  const value = (format || '').trim().toLowerCase();
+  if (value.startsWith('image/')) return value;
+  if (value.includes('png')) return 'image/png';
+  if (value.includes('gif')) return 'image/gif';
+  if (value.includes('webp')) return 'image/webp';
+  return 'image/jpeg';
 }

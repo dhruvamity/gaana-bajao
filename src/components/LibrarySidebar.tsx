@@ -17,6 +17,7 @@ import { Playlist, Artist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAudio } from '../context/AudioContext';
+import { CoverArt } from './CoverArt';
 
 interface LibrarySidebarProps {
   currentView: string;
@@ -111,7 +112,7 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
               className="w-11 h-11 rounded-xl overflow-hidden shadow-sm hover:ring-2 ring-primary/50 transition-all block group"
               title={pl.title}
             >
-              <img src={pl.coverUrl} alt={pl.title} className="w-full h-full object-cover" />
+              <CoverArt src={pl.coverUrl} title={pl.title} artist={pl.ownerName} id={pl.id} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
@@ -258,9 +259,11 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
                   : 'hover:bg-white/5 text-on-surface-variant hover:text-white'
               }`}
             >
-              <img
+              <CoverArt
                 src={pl.coverUrl}
-                alt={pl.title}
+                title={pl.title}
+                artist={pl.ownerName}
+                id={pl.id}
                 className="w-12 h-12 rounded-xl object-cover flex-shrink-0 group-hover:scale-102 transition-transform shadow-sm"
               />
 
@@ -290,9 +293,10 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
                   : 'hover:bg-white/5 text-on-surface-variant hover:text-white'
               }`}
             >
-              <img
+              <CoverArt
                 src={artist.avatarUrl}
-                alt={artist.name}
+                title={artist.name}
+                id={artist.id}
                 className="w-12 h-12 rounded-full object-cover flex-shrink-0 group-hover:scale-102 transition-transform shadow-sm"
               />
 

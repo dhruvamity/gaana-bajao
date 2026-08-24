@@ -21,6 +21,7 @@ import { Track, Playlist, Artist } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
+import { CoverArt } from './CoverArt';
 
 interface HomeViewProps {
   onSelectArtist: (artistId: string) => void;
@@ -97,7 +98,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       cards.push({
         id: 'quick_liked',
         title: 'Liked Songs',
-        coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300&auto=format&fit=crop&q=80',
+        coverUrl: '',
         isLikedCard: true
       });
     }
@@ -106,7 +107,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       cards.push({
         id: pl.id,
         title: pl.title,
-        coverUrl: pl.coverUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80',
+        coverUrl: pl.coverUrl || '',
         playlist: pl
       });
     });
@@ -196,9 +197,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <Heart size={24} fill="#ffffff" className="text-white" />
                     </div>
                   ) : (
-                    <img
+                    <CoverArt
                       src={card.coverUrl}
-                      alt={card.title}
+                      title={card.title}
+                      id={card.id}
                       className="w-16 h-16 object-cover flex-shrink-0"
                     />
                   )}
@@ -257,9 +259,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 className="group p-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer space-y-3 relative hover:scale-102"
               >
                 <div className="relative aspect-square rounded-xl overflow-hidden shadow-md">
-                  <img
+                  <CoverArt
                     src={pl.coverUrl}
-                    alt={pl.title}
+                    title={pl.title}
+                    artist={pl.ownerName}
+                    id={pl.id}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
 
@@ -320,9 +324,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   className="group p-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer space-y-3 relative hover:scale-102"
                 >
                   <div className="relative aspect-square rounded-xl overflow-hidden shadow-md">
-                    <img
+                    <CoverArt
                       src={track.coverUrl}
-                      alt={track.title}
+                      title={track.title}
+                      artist={track.artist}
+                      id={track.id}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
 
@@ -445,9 +451,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 className="group p-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer space-y-3 text-center hover:scale-102"
               >
                 <div className="relative aspect-square rounded-full overflow-hidden shadow-md mx-auto max-w-[140px]">
-                  <img
+                  <CoverArt
                     src={artist.avatarUrl}
-                    alt={artist.name}
+                    title={artist.name}
+                    id={artist.id}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>

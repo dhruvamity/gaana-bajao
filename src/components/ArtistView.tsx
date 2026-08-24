@@ -17,6 +17,7 @@ import { DatabaseService } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { FolderPlus } from 'lucide-react';
+import { CoverArt } from './CoverArt';
 
 interface ArtistViewProps {
   artistId: string;
@@ -104,9 +105,11 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
       {/* Hero Banner with Glass Overlay */}
       <section className="relative overflow-hidden rounded-3xl glass-elevated border border-white/10 h-72 sm:h-96 flex flex-col justify-end p-6 sm:p-10 shadow-2xl">
-        <img
+        <CoverArt
           src={artist.bannerUrl}
-          alt={artist.name}
+          title={artist.name}
+          id={artist.id}
+          loading="eager"
           className="absolute inset-0 w-full h-full object-cover filter brightness-50"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
@@ -183,7 +186,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                   </span>
 
                   <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
-                    <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+                    <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                     <button
                       onClick={() => playTrack(track, artistTracks)}
                       className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { Track } from '../types';
+import { CoverArt } from './CoverArt';
 
 export const QueueDrawer: React.FC = () => {
   const { 
@@ -109,7 +110,7 @@ export const QueueDrawer: React.FC = () => {
 
               <div className="p-3.5 rounded-2xl bg-primary/10 border border-primary/40 flex items-center justify-between gap-3">
                 <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
-                  <img src={currentTrack.coverUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
+                  <CoverArt src={currentTrack.coverUrl} title={currentTrack.title} artist={currentTrack.artist} id={currentTrack.id} className="w-full h-full object-cover" />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -150,7 +151,7 @@ export const QueueDrawer: React.FC = () => {
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
-                          <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+                          <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                           <button
                             onClick={() => playTrack(track, queue)}
                             className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

@@ -19,6 +19,7 @@ import { Playlist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
+import { CoverArt } from './CoverArt';
 
 interface PlaylistViewProps {
   playlist: Playlist;
@@ -116,9 +117,12 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       {/* Playlist Hero Section */}
       <section className="relative overflow-hidden rounded-3xl glass-elevated border border-white/10 p-6 sm:p-8 flex flex-col md:flex-row items-center md:items-end gap-6 sm:gap-8 shadow-2xl">
         <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 group">
-          <img
+          <CoverArt
             src={currentPlaylist.coverUrl}
-            alt={currentPlaylist.title}
+            title={currentPlaylist.title}
+            artist={currentPlaylist.ownerName}
+            id={currentPlaylist.id}
+            loading="eager"
             className="w-full h-full object-cover"
           />
         </div>
@@ -145,11 +149,11 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
             {currentPlaylist.collaborators && currentPlaylist.collaborators.length > 0 && (
               <div className="flex items-center -space-x-2 ml-2">
                 {currentPlaylist.collaborators.map((c) => (
-                  <img
+                  <CoverArt
                     key={c.id}
                     src={c.avatar}
-                    alt={c.name}
                     title={c.name}
+                    id={c.id}
                     className="w-6 h-6 rounded-full object-cover ring-2 ring-background"
                   />
                 ))}
@@ -238,7 +242,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                 className="p-2.5 rounded-2xl glass-panel border border-white/5 flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <img src={t.coverUrl} alt={t.title} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                  <CoverArt src={t.coverUrl} title={t.title} artist={t.artist} id={t.id} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
                   <div className="min-w-0">
                     <h5 className="text-xs font-bold text-white truncate">{t.title}</h5>
                     <p className="text-[10px] text-on-surface-variant truncate">{t.artist}</p>
@@ -292,7 +296,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                   </span>
 
                   <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
-                    <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+                    <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                     <button
                       onClick={() => playTrack(track, tracks)}
                       className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

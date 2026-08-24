@@ -15,6 +15,7 @@ import { Track, Artist } from '../types';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { DatabaseService } from '../services/firebase';
+import { CoverArt } from './CoverArt';
 
 interface NowPlayingSidebarProps {
   onClose: () => void;
@@ -76,9 +77,12 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
       <div className="p-4 space-y-5">
         {/* Large Album Artwork */}
         <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl group ring-1 ring-white/10">
-          <img
+          <CoverArt
             src={currentTrack.coverUrl}
-            alt={currentTrack.title}
+            title={currentTrack.title}
+            artist={currentTrack.artist}
+            id={currentTrack.id}
+            loading="eager"
             className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-102' : 'scale-100'}`}
           />
         </div>
@@ -131,9 +135,10 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
         {artist && (
           <div className="relative rounded-2xl overflow-hidden bg-surface-container/60 border border-white/10 group hover:border-primary/30 transition-all">
             <div className="relative h-44 overflow-hidden">
-              <img
+              <CoverArt
                 src={artist.bannerUrl || artist.avatarUrl}
-                alt={artist.name}
+                title={artist.name}
+                id={artist.id}
                 className="w-full h-full object-cover filter brightness-75 group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container/40 to-transparent" />
@@ -195,9 +200,11 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
               className="flex items-center justify-between gap-3 group cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <img
+                <CoverArt
                   src={nextTrack.coverUrl}
-                  alt={nextTrack.title}
+                  title={nextTrack.title}
+                  artist={nextTrack.artist}
+                  id={nextTrack.id}
                   className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                 />
                 <div className="min-w-0">
