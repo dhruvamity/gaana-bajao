@@ -142,7 +142,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
   };
 
   return (
-    <div className="space-y-10 pb-32 px-6 lg:px-8 pt-4">
+    <div className="space-y-10 pb-32 px-4 sm:px-6 lg:px-8 pt-4">
       <div className="space-y-4">
         {/* No search field here: the top bar carries it on this view, as in the
             comp, and both are bound to the same query state. */}

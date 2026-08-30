@@ -25,6 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import { Track } from '../types';
 import { Scrubber } from './Scrubber';
 import { CoverArt } from './CoverArt';
+import { getCoverTint } from '../utils/coverArt';
 
 interface NowPlayingModalProps {
   onSelectArtist?: (artistId: string) => void;
@@ -87,18 +88,22 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
     logInteraction(isLiked ? 'unlike' : 'like', currentTrack.id);
   };
 
+  /* Screen wash, seeded the same way the generated artwork is, so the tint and
+     the cover always agree. */
+  const screenTint = getCoverTint(
+    { title: currentTrack.title, artist: currentTrack.artist, id: currentTrack.id },
+    { lightness: 24 }
+  );
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-background flex flex-col justify-between p-4 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
-      {/* Dynamic Ambient Background Blur */}
-      <div 
-        className="absolute inset-0 opacity-20 pointer-events-none filter blur-[100px] transition-all duration-1000"
-        style={{
-          backgroundImage:
-            `radial-gradient(circle at 50% 30%, ${
-              currentTrack.acoustics.energy > 0.7 ? '#1ed760' : '#3f6f52'
-            } 0%, transparent 60%)`
-        }}
-      />
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto flex flex-col justify-between p-4 pb-safe sm:p-8 animate-in fade-in zoom-in-95 duration-200"
+      style={{
+        /* The mobile comp tints the entire screen from the album art and fades
+           it to black toward the controls. */
+        backgroundImage: `linear-gradient(180deg, ${screenTint} 0%, rgba(0,0,0,.75) 62%, #000000 100%)`
+      }}
+    >
 
       {/* Top Bar Header */}
       <header className="relative z-10 flex items-center justify-between max-w-4xl mx-auto w-full">
@@ -109,12 +114,12 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           <ChevronDown size={24} />
         </button>
 
-        <div className="text-center">
-          <span className="text-[11px] font-semibold text-primary uppercase tracking-widest flex items-center justify-center gap-1.5">
-            <Radio size={13} className="animate-pulse" />
-            Now Playing
+        <div className="text-center min-w-0 px-3">
+          <span className="text-2xs font-bold text-white/70 uppercase tracking-label flex items-center justify-center gap-1.5">
+            <Radio size={12} className="animate-pulse" />
+            Playing from
           </span>
-          <h3 className="text-sm font-semibold text-white truncate max-w-xs">{currentTrack.album}</h3>
+          <h3 className="text-base font-bold text-white truncate">{currentTrack.album || currentTrack.artist}</h3>
         </div>
 
         <button
@@ -134,7 +139,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
       {/* Center Section: Album Art & Visualizer / Tabs */}
       <main className="relative z-10 max-w-lg mx-auto w-full my-auto py-6 flex flex-col items-center">
         {/* Album Artwork Card */}
-        <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-lg overflow-hidden bg-surface-container-high p-2 shadow-card group">
+        <div className="relative w-full max-w-[380px] aspect-square rounded overflow-hidden shadow-card group">
           <CoverArt
             src={currentTrack.coverUrl}
             title={currentTrack.title}
@@ -282,9 +287,11 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             size="md"
           />
 
-          <div className="flex items-center justify-between text-xs text-on-surface-variant font-medium">
+          <div className="flex items-center justify-between text-2xs text-white/70 font-medium tabular-nums">
             <span>{formatTime(progress)}</span>
-            <span>{formatTime(duration)}</span>
+            {/* The comp counts the remaining time down rather than showing the
+                track length, which is already on every list row. */}
+            <span>-{formatTime(Math.max(0, duration - progress))}</span>
           </div>
         </div>
 
@@ -305,15 +312,15 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             className="p-3 text-on-surface-variant hover:text-white transition-colors"
             title="Previous track"
           >
-            <SkipBack size={26} />
+            <SkipBack size={34} fill="currentColor" />
           </button>
 
           <button
             onClick={togglePlay}
-            className="w-16 h-16 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
+            className="w-[67px] h-[67px] rounded-full bg-white hover:bg-white/90 text-black flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
             title={isPlaying ? 'Pause' : 'Play'}
           >
-            {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+            {isPlaying ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" className="ml-1" />}
           </button>
 
           <button
@@ -321,7 +328,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             className="p-3 text-on-surface-variant hover:text-white transition-colors"
             title="Next track (Skip)"
           >
-            <SkipForward size={26} />
+            <SkipForward size={34} fill="currentColor" />
           </button>
 
           <button

@@ -20,9 +20,12 @@ interface HomeViewProps {
 /** The comp's home hero is a saturated indigo fading into the column. */
 const HOME_HERO = '#3333a3';
 
-/** A card row: fluid, but sized around the comp's 224px tile and 31px gutter. */
+/** A card row: fluid, but sized around the comp's 224px tile and 31px gutter.
+ *  The floor drops on small screens so a phone gets two columns rather than one
+ *  card stretched across the whole width. */
 const CARD_GRID =
-  'grid gap-[31px] [grid-template-columns:repeat(auto-fill,minmax(168px,1fr))]';
+  'grid gap-4 sm:gap-[31px] [grid-template-columns:repeat(auto-fill,minmax(136px,1fr))] ' +
+  'sm:[grid-template-columns:repeat(auto-fill,minmax(168px,1fr))]';
 
 export const HomeView: React.FC<HomeViewProps> = ({
   onSelectArtist,
@@ -130,7 +133,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         style={{ ['--hero' as string]: HOME_HERO }}
       />
 
-      <div className="relative px-6 lg:px-8 pb-12">
+      <div className="relative px-4 sm:px-6 lg:px-8 pb-12">
         {/* Genre filter pills, derived from what is actually in the catalog. */}
         {dynamicCategories.length > 1 && (
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pt-2 pb-6">

@@ -10,6 +10,8 @@ import { PlaylistsDirectoryView } from './components/PlaylistsDirectoryView';
 import { PlaylistView } from './components/PlaylistView';
 import { ArtistView } from './components/ArtistView';
 import { MiniPlayer } from './components/MiniPlayer';
+import { MobileMiniPlayer } from './components/MobileMiniPlayer';
+import { MobileTabBar } from './components/MobileTabBar';
 import { NowPlayingModal } from './components/NowPlayingModal';
 import { ConnectMenu } from './components/ConnectMenu';
 import { TasteOnboarding } from './components/TasteOnboarding';
@@ -250,13 +252,20 @@ const MainAppContent: React.FC = () => {
         )}
       </div>
 
-      {/* 3. Persistent Full-Width Bottom Player Bar */}
-      <MiniPlayer 
+      {/* Bottom chrome. The desktop bar and the mobile docked card are
+          different objects in the comp, so each renders at its own breakpoint
+          rather than one bar trying to be both. */}
+      <div className="hidden md:block">
+        <MiniPlayer 
         onSelectArtist={handleSelectArtist}
         onOpenAddToPlaylist={handleOpenAddToPlaylist}
         isRightSidebarOpen={isRightSidebarOpen}
         onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-      />
+        />
+      </div>
+
+      <MobileMiniPlayer />
+      <MobileTabBar currentView={currentView} onNavigate={navigate} />
 
       {/* Fullscreen Player Modal */}
       <NowPlayingModal 
