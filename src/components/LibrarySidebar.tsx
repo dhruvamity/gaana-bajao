@@ -1,28 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Library, 
-  Plus, 
-  Search, 
-  Heart, 
-  Music, 
-  Users, 
-  Pin, 
-  ArrowUpDown,
-  Sparkles,
-  ChevronRight,
+import {
+  Library,
+  Plus,
+  Search,
+  Heart,
+  Home,
   ChevronLeft,
   X
 } from 'lucide-react';
-import { Playlist, Artist, Track } from '../types';
+import { Playlist, Artist } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
-import { useAudio } from '../context/AudioContext';
 import { CoverArt } from './CoverArt';
 
 interface LibrarySidebarProps {
   currentView: string;
   selectedPlaylistId?: string;
   selectedArtistId?: string;
+  onNavigate: (view: string) => void;
   onSelectPlaylist: (playlist: Playlist) => void;
   onSelectArtist: (artistId: string) => void;
   onSelectLikedSongs: () => void;
@@ -31,10 +26,19 @@ interface LibrarySidebarProps {
   onToggleCollapse: () => void;
 }
 
+/**
+ * The left navigation column.
+ *
+ * The comp treats this as a flush, square-cornered black column — not a
+ * floating panel — carrying three destinations on a 52px pitch, two library
+ * actions, a hairline, and then the user's playlists as *plain text*. Artwork
+ * appears nowhere in this column.
+ */
 export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
   currentView,
   selectedPlaylistId,
   selectedArtistId,
+  onNavigate,
   onSelectPlaylist,
   onSelectArtist,
   onSelectLikedSongs,
@@ -43,12 +47,10 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
   onToggleCollapse
 }) => {
   const { currentUser } = useAuth();
-  const { playTrack } = useAudio();
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'playlists' | 'artists'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -64,58 +66,63 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
     loadLibrary();
   }, [currentView]);
 
-  const filteredPlaylists = playlists.filter(p => 
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const q = filterQuery.trim().toLowerCase();
+  const filteredPlaylists = q
+    ? playlists.filter(p => p.title.toLowerCase().includes(q) || p.ownerName.toLowerCase().includes(q))
+    : playlists;
+  const filteredArtists = q ? artists.filter(a => a.name.toLowerCase().includes(q)) : artists;
 
-  const filteredArtists = artists.filter(a => 
-    a.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  /* ---------------------------------------------------------------- collapsed */
 
   if (isCollapsed) {
     return (
-      <aside className="w-18 app-panel bg-surface-container-lowest flex flex-col items-center py-4 gap-4 select-none h-full">
+      <aside className="w-nav-sm bg-background flex flex-col items-center py-5 gap-5 select-none h-full flex-shrink-0">
         <button
           onClick={onToggleCollapse}
-          className="p-3 rounded text-on-surface-variant hover:text-white transition-colors"
-          title="Expand Your Library"
+          className="p-2 text-on-surface-variant hover:text-white transition-colors"
+          title="Expand your library"
           aria-label="Expand your library"
         >
-          <Library size={24} />
+          <Library size={26} />
         </button>
 
         <button
           onClick={onOpenCreatePlaylist}
-          className="p-3 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-white transition-colors"
-          title="Create Playlist"
+          className="w-10 h-10 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-white transition-colors flex items-center justify-center"
+          title="Create playlist"
           aria-label="Create playlist"
         >
           <Plus size={20} />
         </button>
 
-        <div className="w-8 h-px bg-white/10 my-1" />
-
-        {/* Liked songs mini icon */}
         <button
           onClick={onSelectLikedSongs}
-          className="w-12 h-12 rounded bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center hover:scale-105 transition-transform"
+          className="w-11 h-11 rounded bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center hover:scale-105 transition-transform"
           title="Liked Songs"
           aria-label="Liked Songs"
         >
           <Heart size={18} fill="currentColor" className="text-white" />
         </button>
 
-        {/* Playlists mini covers */}
-        <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 scrollbar-none">
-          {playlists.slice(0, 8).map(pl => (
+        <div className="w-8 h-px bg-white/10" />
+
+        {/* Collapsed is the one place artwork earns its keep: a name would not
+            fit, so covers stand in as the only way to tell rows apart. */}
+        <div className="flex-1 min-h-0 w-full flex flex-col items-center gap-2 overflow-y-auto scrollbar-none">
+          {playlists.map(pl => (
             <button
               key={pl.id}
               onClick={() => onSelectPlaylist(pl)}
-              className="w-12 h-12 rounded overflow-hidden hover:scale-105 transition-transform block group"
+              className="w-11 h-11 rounded overflow-hidden hover:scale-105 transition-transform flex-shrink-0"
               title={pl.title}
             >
-              <CoverArt src={pl.coverUrl} title={pl.title} artist={pl.ownerName} id={pl.id} className="w-full h-full object-cover" />
+              <CoverArt
+                src={pl.coverUrl}
+                title={pl.title}
+                artist={pl.ownerName}
+                id={pl.id}
+                className="w-full h-full object-cover"
+              />
             </button>
           ))}
         </div>
@@ -123,204 +130,195 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
     );
   }
 
-  return (
-    <aside className="w-72 sm:w-80 app-panel bg-surface-container-lowest flex flex-col h-full select-none flex-shrink-0">
-      {/* Sidebar Header */}
-      <div className="p-4 pb-2 space-y-3">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onToggleCollapse}
-            className="flex items-center gap-3 text-on-surface-variant hover:text-white font-bold text-base tracking-tight transition-colors group"
-            aria-label="Collapse your library"
-          >
-            <Library size={24} className="text-on-surface-variant group-hover:text-white transition-colors" />
-            <span>Your Library</span>
-          </button>
+  /* ----------------------------------------------------------------- expanded */
 
-          <div className="flex items-center gap-1">
+  const navItem = (
+    label: string,
+    icon: React.ReactNode,
+    isActive: boolean,
+    onClick: () => void
+  ) => (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={isActive ? 'page' : undefined}
+      className={`h-13 w-full flex items-center gap-5 text-lg font-bold transition-opacity ${
+        isActive ? 'text-white opacity-100' : 'text-white opacity-70 hover:opacity-100'
+      }`}
+    >
+      <span className="w-8 flex items-center justify-center flex-shrink-0">{icon}</span>
+      <span className="truncate">{label}</span>
+    </button>
+  );
+
+  return (
+    <aside className="w-nav bg-background flex flex-col h-full select-none flex-shrink-0">
+      {/* Destinations. Figma places these on a 52px pitch starting 70px down. */}
+      <nav className="px-[30px] pt-16 flex flex-col">
+        {navItem(
+          'Home',
+          <Home size={28} fill={currentView === 'home' ? 'currentColor' : 'none'} />,
+          currentView === 'home',
+          () => onNavigate('home')
+        )}
+        {navItem(
+          'Search',
+          <Search size={28} strokeWidth={currentView === 'search' ? 2.75 : 2} />,
+          currentView === 'search',
+          () => onNavigate('search')
+        )}
+        {navItem(
+          'Your Library',
+          <Library size={28} />,
+          currentView === 'playlists',
+          () => onNavigate('playlists')
+        )}
+      </nav>
+
+      {/* Library actions, offset below the destinations as in the comp. */}
+      <div className="px-[30px] pt-8 flex flex-col">
+        <button
+          type="button"
+          onClick={onOpenCreatePlaylist}
+          className="h-13 w-full flex items-center gap-5 text-lg font-bold text-white opacity-70 hover:opacity-100 transition-opacity"
+        >
+          <span className="w-8 flex items-center justify-center flex-shrink-0">
+            <span className="w-6 h-6 rounded-sm bg-on-surface-variant text-black flex items-center justify-center">
+              <Plus size={16} strokeWidth={3} />
+            </span>
+          </span>
+          <span>Create Playlist</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onSelectLikedSongs}
+          className="h-13 w-full flex items-center gap-5 text-lg font-bold text-white hover:opacity-100 transition-opacity"
+        >
+          <span className="w-8 flex items-center justify-center flex-shrink-0">
+            <span className="w-6 h-6 rounded-sm bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center">
+              <Heart size={13} fill="currentColor" className="text-white" />
+            </span>
+          </span>
+          <span>Liked Songs</span>
+        </button>
+      </div>
+
+      {/* Hairline separating navigation from the library list. */}
+      <div className="px-[30px] pt-5">
+        <div className="h-px bg-white/15" />
+      </div>
+
+      {/* Filter row. Not in the comp, but the list is unbounded in a real
+          library and this is the only way to get through a long one. */}
+      <div className="px-[30px] pt-3 flex items-center justify-between gap-2 min-h-9">
+        {isSearchOpen ? (
+          <div className="relative flex items-center w-full">
+            <Search size={14} className="absolute left-2.5 text-on-surface-variant" aria-hidden="true" />
+            <input
+              type="text"
+              autoFocus
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Filter your library"
+              aria-label="Filter your library"
+              className="w-full pl-8 pr-7 py-1.5 rounded bg-surface-container-high text-white text-sm placeholder-on-surface-variant focus:outline-none"
+            />
             <button
-              onClick={onOpenCreatePlaylist}
-              className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors"
-              title="Create playlist or folder"
-              aria-label="Create playlist"
+              onClick={() => {
+                setIsSearchOpen(false);
+                setFilterQuery('');
+              }}
+              className="absolute right-1.5 text-on-surface-variant hover:text-white"
+              aria-label="Clear filter"
             >
-              <Plus size={18} />
+              <X size={13} />
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="p-1 text-on-surface-variant hover:text-white transition-colors"
+              title="Filter your library"
+              aria-label="Filter your library"
+            >
+              <Search size={16} />
             </button>
             <button
               onClick={onToggleCollapse}
-              className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors"
+              className="p-1 text-on-surface-variant hover:text-white transition-colors"
               title="Collapse library"
               aria-label="Collapse library"
             >
               <ChevronLeft size={18} />
             </button>
-          </div>
-        </div>
-
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => setActiveFilter(activeFilter === 'playlists' ? 'all' : 'playlists')}
-            aria-pressed={activeFilter === 'playlists'}
-            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-              activeFilter === 'playlists'
-                ? 'bg-white text-black font-medium'
-                : 'bg-surface-container-high text-white hover:bg-surface-container-highest'
-            }`}
-          >
-            Playlists
-          </button>
-          <button
-            onClick={() => setActiveFilter(activeFilter === 'artists' ? 'all' : 'artists')}
-            aria-pressed={activeFilter === 'artists'}
-            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-              activeFilter === 'artists'
-                ? 'bg-white text-black font-medium'
-                : 'bg-surface-container-high text-white hover:bg-surface-container-highest'
-            }`}
-          >
-            Artists
-          </button>
-        </div>
-
-        {/* Search & Sort Row */}
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center">
-            {isSearchOpen ? (
-              <div className="relative flex items-center">
-                <Search size={14} className="absolute left-2.5 text-on-surface-variant" />
-                <input
-                  type="text"
-                  autoFocus
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search in Your Library"
-                  aria-label="Search in your library"
-                  className="w-44 pl-8 pr-6 py-1.5 rounded bg-surface-container-high text-white text-sm placeholder-on-surface-variant focus:outline-none"
-                />
-                <button 
-                  onClick={() => {
-                    setIsSearchOpen(false);
-                    setSearchQuery('');
-                  }}
-                  className="absolute right-1.5 text-on-surface-variant hover:text-white"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsSearchOpen(true)}
-                className="p-1.5 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors"
-                title="Search in Your Library"
-                aria-label="Search in your library"
-              >
-                <Search size={16} />
-              </button>
-            )}
-          </div>
-
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-white transition-colors"
-            title="Sort order"
-          >
-            <span>Recents</span>
-            <ArrowUpDown size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Scrollable Library Content List */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5 pb-4">
-        {/* 1. Liked Songs Pinned Row */}
-        {activeFilter !== 'artists' && (!searchQuery || 'liked songs'.includes(searchQuery.toLowerCase())) && (
-          <button
-            type="button"
-            onClick={onSelectLikedSongs}
-            className={`w-full text-left p-2 rounded flex items-center gap-3 transition-colors ${
-              currentView === 'liked' ? 'bg-white/10' : 'hover:bg-white/10'
-            }`}
-          >
-            <div className="w-12 h-12 rounded bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center flex-shrink-0">
-              <Heart size={20} fill="currentColor" className="text-white" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h4 className="text-base text-white truncate">Liked Songs</h4>
-              <p className="text-sm text-on-surface-variant flex items-center gap-1.5 truncate">
-                <Pin size={12} className="text-primary fill-primary flex-shrink-0" />
-                <span>Playlist &bull; {currentUser?.likedTrackIds?.length || 0} songs</span>
-              </p>
-            </div>
-          </button>
+          </>
         )}
-
-        {/* 2. Playlists List */}
-        {activeFilter !== 'artists' && filteredPlaylists.map((pl) => {
-          const isSelected = currentView === 'playlist' && selectedPlaylistId === pl.id;
-
-          return (
-            <button
-              type="button"
-              key={pl.id}
-              onClick={() => onSelectPlaylist(pl)}
-              aria-current={isSelected ? 'page' : undefined}
-              className={`w-full text-left p-2 rounded flex items-center gap-3 transition-colors ${
-                isSelected ? 'bg-white/10' : 'hover:bg-white/10'
-              }`}
-            >
-              <CoverArt
-                src={pl.coverUrl}
-                title={pl.title}
-                artist={pl.ownerName}
-                id={pl.id}
-                className="w-12 h-12 rounded object-cover flex-shrink-0"
-              />
-
-              <div className="min-w-0 flex-1">
-                <h4 className={`text-base truncate ${isSelected ? 'text-primary' : 'text-white'}`}>
-                  {pl.title}
-                </h4>
-                <p className="text-sm text-on-surface-variant truncate">
-                  Playlist &bull; {pl.ownerName}
-                </p>
-              </div>
-            </button>
-          );
-        })}
-
-        {/* 3. Artists List */}
-        {activeFilter !== 'playlists' && filteredArtists.map((artist) => {
-          const isSelected = currentView === 'artist' && selectedArtistId === artist.id;
-
-          return (
-            <button
-              type="button"
-              key={artist.id}
-              onClick={() => onSelectArtist(artist.id)}
-              aria-current={isSelected ? 'page' : undefined}
-              className={`w-full text-left p-2 rounded flex items-center gap-3 transition-colors ${
-                isSelected ? 'bg-white/10' : 'hover:bg-white/10'
-              }`}
-            >
-              <CoverArt
-                src={artist.avatarUrl}
-                title={artist.name}
-                id={artist.id}
-                className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-              />
-
-              <div className="min-w-0 flex-1">
-                <h4 className={`text-base truncate ${isSelected ? 'text-primary' : 'text-white'}`}>
-                  {artist.name}
-                </h4>
-                <p className="text-sm text-on-surface-variant truncate">Artist</p>
-              </div>
-            </button>
-          );
-        })}
       </div>
+
+      {/* The library itself: plain 18px text rows, 18px apart, no artwork. */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-[30px] py-4 scrollbar-none">
+        <ul className="flex flex-col gap-[18px]">
+          {filteredPlaylists.map(pl => {
+            const isSelected = currentView === 'playlist' && selectedPlaylistId === pl.id;
+            return (
+              <li key={pl.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectPlaylist(pl)}
+                  aria-current={isSelected ? 'page' : undefined}
+                  title={`${pl.title} — playlist by ${pl.ownerName}`}
+                  className={`block w-full text-left text-lg truncate transition-colors ${
+                    isSelected ? 'text-primary' : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  {pl.title}
+                </button>
+              </li>
+            );
+          })}
+
+          {/* Artists have no home in the comp's sidebar, but they are a real
+              destination here and are otherwise only reachable through search.
+              They continue the same plain-text pattern under their own label. */}
+          {filteredArtists.length > 0 && (
+            <li className="pt-2 text-2xs font-bold uppercase tracking-label text-outline">
+              Artists
+            </li>
+          )}
+          {filteredArtists.map(artist => {
+            const isSelected = currentView === 'artist' && selectedArtistId === artist.id;
+            return (
+              <li key={artist.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectArtist(artist.id)}
+                  aria-current={isSelected ? 'page' : undefined}
+                  title={`${artist.name} — artist`}
+                  className={`block w-full text-left text-lg truncate transition-colors ${
+                    isSelected ? 'text-primary' : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  {artist.name}
+                </button>
+              </li>
+            );
+          })}
+
+          {filteredPlaylists.length === 0 && filteredArtists.length === 0 && (
+            <li className="text-sm text-outline">
+              {q ? `Nothing matches “${filterQuery}”.` : 'Your library is empty.'}
+            </li>
+          )}
+        </ul>
+      </div>
+
+      {currentUser && (
+        <div className="px-[30px] py-4 text-2xs text-outline truncate">
+          {currentUser.likedTrackIds?.length || 0} liked &bull; {playlists.length} playlists
+        </div>
+      )}
     </aside>
   );
 };

@@ -1,48 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Home, 
-  Search, 
-  Compass, 
-  Plus, 
-  Settings, 
-  Cast, 
-  Sparkles, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Plus,
+  Settings,
+  Sparkles,
   ChevronDown,
-  UserCheck,
-  UserPlus,
-  Bell,
-  Download,
-  FolderPlus
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useAudio } from '../context/AudioContext';
 import { CoverArt } from './CoverArt';
 
 interface NavbarProps {
   currentView: string;
-  setCurrentView: (view: string) => void;
   onOpenUpload: () => void;
   onOpenSettings: () => void;
   /** Shared with SearchExploreView so typing here actually searches. */
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
+  /** True once the content column has scrolled, which opaques the bar. */
+  isScrolled?: boolean;
+  canGoBack?: boolean;
+  onBack?: () => void;
 }
 
+/**
+ * The top bar, which in this design lives *inside* the content column rather
+ * than spanning the app.
+ *
+ * It is transparent by default so the page's hero wash shows through, and
+ * turns opaque once the column scrolls. Primary navigation is not here — it
+ * moved to the left column, matching the comp.
+ */
 export const Navbar: React.FC<NavbarProps> = ({
   currentView,
-  setCurrentView,
   onOpenUpload,
   onOpenSettings,
   searchQuery,
-  onSearchQueryChange
+  onSearchQueryChange,
+  isScrolled = false,
+  canGoBack = false,
+  onBack
 }) => {
-  const { 
-    currentUser, 
-    setIsOnboardingOpen,
-    setIsUserModalOpen
-  } = useAuth();
-  
-  const { setIsConnectOpen } = useAudio();
+  const { currentUser, setIsOnboardingOpen, setIsUserModalOpen, logout } = useAuth();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -57,114 +58,84 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  return (
-    <header className="z-40 w-full bg-background px-4 sm:px-6 py-2 flex items-center justify-between gap-4 flex-shrink-0">
-      {/* 1. Left: Brand & Home Navigation Button */}
-      <div className="flex items-center gap-3 sm:gap-4">
-        <button 
-          onClick={() => setCurrentView('home')}
-          className="flex items-center gap-2.5 group text-left"
-        >
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="material-symbols-outlined text-on-primary text-lg font-bold">graphic_eq</span>
-          </div>
-          <h1 className="font-headline font-bold text-base tracking-tight text-white hidden sm:inline">
-            Gaana-Bajao
-          </h1>
-        </button>
+  const circleButton =
+    'w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center ' +
+    'transition enabled:hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed';
 
-        {/* Circular Home Icon button */}
+  return (
+    <header
+      className={`sticky top-0 z-40 h-header flex-shrink-0 flex items-center gap-4 px-4 sm:px-6 transition-colors duration-200 ${
+        isScrolled ? 'bg-surface-container-lowest/95 backdrop-blur' : 'bg-transparent'
+      }`}
+    >
+      {/* Back / forward. Only "back" has real history to act on — the app keeps
+          a single view stack, so forward is present for shape and stays
+          disabled rather than pretending to work. */}
+      <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
         <button
-          onClick={() => setCurrentView('home')}
-          className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
-            currentView === 'home'
-              ? 'bg-surface-container-high text-white'
-              : 'bg-surface-container text-on-surface-variant hover:text-white hover:bg-surface-container-high'
-          }`}
-          title="Home"
-          aria-label="Home"
-          aria-current={currentView === 'home' ? 'page' : undefined}
+          type="button"
+          onClick={onBack}
+          disabled={!canGoBack}
+          className={circleButton}
+          title="Go back"
+          aria-label="Go back"
         >
-          <Home size={22} fill={currentView === 'home' ? 'currentColor' : 'none'} />
+          <ChevronLeft size={20} />
+        </button>
+        <button
+          type="button"
+          disabled
+          className={circleButton}
+          title="Go forward"
+          aria-label="Go forward"
+        >
+          <ChevronRight size={20} />
         </button>
       </div>
 
-      {/* 2. Center: Global Search Input Pill */}
-      <div className="flex-1 max-w-[474px] mx-auto">
+      {/* Search field, present only on the search view — as in the comp, where
+          every other screen leaves this space to the hero. */}
+      {currentView === 'search' ? (
         <form
           role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setCurrentView('search');
-          }}
-          className="relative flex items-center group"
+          onSubmit={(e) => e.preventDefault()}
+          className="relative flex items-center flex-1 max-w-[364px]"
         >
           <Search
-            size={18}
-            className="absolute left-3.5 text-on-surface-variant group-focus-within:text-white transition-colors pointer-events-none"
+            size={20}
+            className="absolute left-3.5 text-black/60 pointer-events-none"
+            aria-hidden="true"
           />
           <input
             type="search"
             value={searchQuery}
-            onChange={(e) => {
-              onSearchQueryChange(e.target.value);
-              if (currentView !== 'search') setCurrentView('search');
-            }}
-            onFocus={() => setCurrentView('search')}
-            placeholder="What do you want to play?"
-            aria-label="Search for songs, artists or moods"
-            className="w-full h-12 pl-11 pr-12 rounded-full bg-surface-container hover:bg-surface-container-high focus:bg-surface-container-high border border-transparent focus:border-white/20 text-white text-sm placeholder-on-surface-variant focus:outline-none transition-colors"
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            autoFocus
+            placeholder="Artists, songs, or albums"
+            aria-label="Search for songs, artists or albums"
+            className="w-full h-11 pl-11 pr-4 rounded-full bg-white text-black text-sm placeholder-black/60 focus:outline-none"
           />
-          <span className="absolute right-12 w-px h-6 bg-white/20" aria-hidden="true" />
-          <button
-            type="button"
-            onClick={() => setCurrentView('search')}
-            className="absolute right-3 p-1 text-on-surface-variant hover:text-white transition-colors"
-            title="Browse all"
-            aria-label="Browse all"
-          >
-            <Compass size={20} />
-          </button>
         </form>
-      </div>
+      ) : (
+        <div className="flex-1" />
+      )}
 
-      {/* 3. Right: Action Buttons & User Profile */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Upload Audio Track */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Upload has no counterpart in the comp, but it is how tracks enter
+            this app at all, so it keeps a permanent slot. */}
         <button
           onClick={onOpenUpload}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black hover:bg-white/90 hover:scale-105 font-bold text-sm transition-all"
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-black hover:scale-105 font-bold text-sm transition-transform"
         >
           <Plus size={16} strokeWidth={2.5} />
           <span className="hidden md:inline">Upload</span>
         </button>
 
-        {/* Connect & Devices */}
-        <button
-          onClick={() => setIsConnectOpen(true)}
-          className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors hover:scale-105"
-          title="Connect to a device"
-          aria-label="Connect to a device"
-        >
-          <Cast size={20} />
-        </button>
-
-        {/* Settings */}
-        <button
-          onClick={onOpenSettings}
-          className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-white transition-colors hover:scale-105"
-          title="Settings"
-          aria-label="Settings"
-        >
-          <Settings size={20} />
-        </button>
-
-        {/* User Account Button & Dropdown */}
         {currentUser && (
           <div className="relative" ref={profileRef}>
             <button
               onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-              className="flex items-center gap-2 p-1 pr-2 rounded-full bg-black hover:bg-surface-container-high transition-colors cursor-pointer"
+              className="flex items-center gap-2.5 p-[3px] pr-3 rounded-full bg-black/80 hover:bg-surface-container-high transition-colors"
               title="Account"
               aria-label="Account menu"
               aria-expanded={isProfileDropdownOpen}
@@ -175,14 +146,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 title={currentUser.name}
                 id={currentUser.id}
                 loading="eager"
-                className="w-8 h-8 rounded-full object-cover"
+                className="w-[34px] h-[34px] rounded-full object-cover flex-shrink-0"
               />
-              <span className="text-sm font-bold text-white hidden md:inline">{currentUser.name}</span>
-              <ChevronDown size={16} className="text-on-surface-variant" />
+              <span className="text-sm font-bold text-white hidden md:inline max-w-[140px] truncate">
+                {currentUser.name}
+              </span>
+              <ChevronDown size={16} className="text-white" />
             </button>
 
             {isProfileDropdownOpen && (
-              <div 
+              <div
                 role="menu"
                 className="absolute right-0 mt-2 w-56 bg-surface-container-high rounded-lg shadow-card p-1 z-50 animate-in fade-in slide-in-from-top-2"
               >
@@ -215,6 +188,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Sparkles size={16} className="text-on-surface-variant" />
                   <span>Music preferences</span>
+                </button>
+
+                {/* Settings lost its own header slot in this layout, so it
+                    lands in the menu the comp's chevron already implies. */}
+                <button
+                  onClick={() => {
+                    onOpenSettings();
+                    setIsProfileDropdownOpen(false);
+                  }}
+                  role="menuitem"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded text-sm text-white hover:bg-white/10 transition-colors text-left"
+                >
+                  <Settings size={16} className="text-on-surface-variant" />
+                  <span>Settings</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsProfileDropdownOpen(false);
+                    void logout();
+                  }}
+                  role="menuitem"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded text-sm text-white hover:bg-white/10 transition-colors text-left"
+                >
+                  <LogOut size={16} className="text-on-surface-variant" />
+                  <span>Log out</span>
                 </button>
               </div>
             )}

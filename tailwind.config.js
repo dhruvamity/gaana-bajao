@@ -16,11 +16,14 @@ export default {
         // whole app re-themes from one place rather than every component
         // needing to be rewritten.
         // ------------------------------------------------------------------
-        "background": "#000000",                    // app shell
-        "surface-container-lowest": "#121212",      // panels (sidebar, main, right rail)
-        "surface-container-low": "#181818",         // cards at rest
+        // Figma calls the nav column pure black and the player bar #181818;
+        // the content column sits between them at #121212 under the hero
+        // gradient. Nothing floats, so there is no separate "shell" colour.
+        "background": "#000000",                    // nav column + app frame
+        "surface-container-lowest": "#121212",      // main content column
+        "surface-container-low": "#181818",         // player bar
         "surface-container": "#181818",
-        "surface-container-high": "#282828",        // card hover / raised control
+        "surface-container-high": "#282828",        // raised control / menu
         "surface-container-highest": "#3E3E3E",     // pressed
         "surface": "#121212",
         "surface-dim": "#0A0A0A",
@@ -31,6 +34,10 @@ export default {
         // Foregrounds
         "on-background": "#FFFFFF",
         "on-surface": "#FFFFFF",
+        // Figma uses #b3b3b3, #adadad and #a6a6a6 in different places. They are
+        // within 13/255 of each other — indistinguishable in situ, and three
+        // near-identical greys is exactly the token drift that made the old
+        // palette unmaintainable. All three collapse to this one value.
         "on-surface-variant": "#B3B3B3",            // subdued body text
         "outline": "#727272",                       // subdued icons
         "outline-variant": "#292929",               // hairlines
@@ -99,10 +106,36 @@ export default {
         // Values the components already reference. Without these the classes
         // compile to nothing, which is why the player bar had no height and the
         // collapsed sidebar had no width.
+        "13": "3.25rem",  // 52px - navigation row pitch in the comp
         "18": "4.5rem",   // 72px
-        "22": "5.5rem",   // 88px - player bar height
-        "84": "21rem",    // 336px - right rail
+        "22": "5.5rem",   // 88px
+        "84": "21rem",    // 336px
         "88": "22rem",
+
+        // ------------------------------------------------------------------
+        // Shell measurements taken from the desktop comp (1728px frame).
+        // Named rather than numeric so the intent survives a re-measure.
+        // ------------------------------------------------------------------
+        "nav": "310px",      // left navigation column
+        "nav-sm": "72px",    // ...collapsed
+        "rail": "346px",     // right panel
+        "player": "112px",   // bottom player bar
+        "header": "80px",    // in-column top bar
+        "card": "224px",     // content tile
+        "art": "182px",      // artwork inside a tile
+        "tile": "82px",      // shortcut tile height (and its square artwork)
+
+        // Mobile comp (428pt frame).
+        "tabbar": "78px",    // bottom tab bar
+        "dock": "59px",      // mini player card above it
+      },
+
+      letterSpacing: {
+        // The comp tracks display type tighter and label type looser; without
+        // these the headings read noticeably wider than the design.
+        "display": "-0.9px",  // 30px section headings
+        "title": "0.6px",     // 20px tile titles
+        "label": "1.28px",    // uppercase "SEE ALL" style labels
       },
 
       scale: {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
 import { Navbar } from './components/Navbar';
@@ -23,6 +23,13 @@ import { AuthModal } from './components/AuthModal';
 import { Playlist, Track } from './types';
 import { Music } from 'lucide-react';
 
+/** A snapshot of everything that decides what the content column renders. */
+interface ViewState {
+  view: string;
+  artistId: string | null;
+  playlist: Playlist | null;
+}
+
 const MainAppContent: React.FC = () => {
   const { currentUser, isAuthenticated, isLoading, isUserModalOpen, setIsUserModalOpen } = useAuth();
   const { currentTrack } = useAudio();
@@ -32,6 +39,47 @@ const MainAppContent: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+
+  // The content column scrolls independently, and the top bar sitting inside it
+  // needs to know when to stop being transparent.
+  const mainRef = useRef<HTMLElement>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  /* The comp's header has a back arrow, which needs somewhere to go. The app
+     has no router, so navigation keeps its own stack of view snapshots. */
+  const [history, setHistory] = useState<ViewState[]>([]);
+
+  const pushHistory = () => {
+    setHistory(h => [
+      ...h.slice(-19),
+      { view: currentView, artistId: selectedArtistId, playlist: selectedPlaylist }
+    ]);
+  };
+
+  const applyView = (state: ViewState) => {
+    setCurrentView(state.view);
+    setSelectedArtistId(state.artistId);
+    setSelectedPlaylist(state.playlist);
+    mainRef.current?.scrollTo({ top: 0 });
+    setIsScrolled(false);
+  };
+
+  const navigate = (view: string) => {
+    if (view === currentView) return;
+    pushHistory();
+    setCurrentView(view);
+    mainRef.current?.scrollTo({ top: 0 });
+    setIsScrolled(false);
+  };
+
+  const goBack = () => {
+    if (history.length === 0) return;
+    // Read the entry outside the updater: StrictMode double-invokes updaters,
+    // and applyView is a side effect that must run exactly once.
+    const previous = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    applyView(previous);
+  };
 
   // Sidebar Layout State
   const [isLibraryCollapsed, setIsLibraryCollapsed] = useState<boolean>(false);
@@ -44,17 +92,24 @@ const MainAppContent: React.FC = () => {
   const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(null);
 
   const handleSelectArtist = (artistId: string) => {
+    pushHistory();
     setSelectedArtistId(artistId);
     setCurrentView('artist');
+    mainRef.current?.scrollTo({ top: 0 });
+    setIsScrolled(false);
   };
 
   const handleSelectPlaylist = (playlist: Playlist) => {
+    pushHistory();
     setSelectedPlaylist(playlist);
     setCurrentView('playlist');
+    mainRef.current?.scrollTo({ top: 0 });
+    setIsScrolled(false);
   };
 
   const handleSelectLikedSongs = () => {
     if (!currentUser) return;
+    pushHistory();
     const likedPlaylist: Playlist = {
       id: 'pl-liked-collection',
       title: 'Liked Songs',
@@ -75,8 +130,7 @@ const MainAppContent: React.FC = () => {
   };
 
   const handlePlaylistCreated = (newPlaylist: Playlist) => {
-    setSelectedPlaylist(newPlaylist);
-    setCurrentView('playlist');
+    handleSelectPlaylist(newPlaylist);
   };
 
   // Loading Screen while verifying 30-day cookie
@@ -99,31 +153,20 @@ const MainAppContent: React.FC = () => {
   }
 
   return (
-    /* Spotify's shell: a pure-black frame with rounded panels floating on it
-       and a small gutter between them. The player bar sits on the black frame
-       at the bottom, in normal flow, so panels above it size correctly rather
-       than being overlapped by a fixed element. */
+    /* The shell is three flush, full-height columns — navigation, content and
+       the right panel — with the player bar spanning beneath them. Nothing
+       floats and nothing is rounded; the columns are separated only by a
+       change of fill, and the top bar lives *inside* the content column so the
+       page's hero wash can run up behind it. */
     <div className="h-screen w-screen bg-background text-on-background flex flex-col font-body antialiased overflow-hidden">
-      {/* 1. Top Integrated Navigation Bar */}
-      <Navbar
-        currentView={currentView}
-        setCurrentView={(view) => {
-          setCurrentView(view);
-        }}
-        onOpenUpload={() => setIsUploadOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-      />
-
-      {/* 2. Three-Column Main Desktop Layout */}
-      <div className="flex-1 flex overflow-hidden relative gap-2 px-2 pb-2 min-h-0">
-        {/* Left: Your Library Sidebar */}
+      <div className="flex-1 flex overflow-hidden relative min-h-0">
+        {/* Left: navigation + library */}
         <div className="hidden md:block h-full min-h-0">
           <LibrarySidebar
             currentView={currentView}
             selectedPlaylistId={selectedPlaylist?.id}
             selectedArtistId={selectedArtistId || undefined}
+            onNavigate={navigate}
             onSelectPlaylist={handleSelectPlaylist}
             onSelectArtist={handleSelectArtist}
             onSelectLikedSongs={handleSelectLikedSongs}
@@ -133,8 +176,23 @@ const MainAppContent: React.FC = () => {
           />
         </div>
 
-        {/* Center: Main Scrollable Content Pane */}
-        <main className="flex-1 h-full min-w-0 overflow-y-auto app-panel bg-surface-container-lowest">
+        {/* Center: the scrolling content column, with its own top bar */}
+        <main
+          ref={mainRef}
+          onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 8)}
+          className="flex-1 h-full min-w-0 overflow-y-auto app-panel bg-surface-container-lowest"
+        >
+          <Navbar
+            currentView={currentView}
+            onOpenUpload={() => setIsUploadOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            isScrolled={isScrolled}
+            canGoBack={history.length > 0}
+            onBack={goBack}
+          />
+
           {currentView === 'home' && (
             <HomeView
               onSelectArtist={handleSelectArtist}
@@ -164,7 +222,7 @@ const MainAppContent: React.FC = () => {
           {currentView === 'artist' && selectedArtistId && (
             <ArtistView
               artistId={selectedArtistId}
-              onBack={() => setCurrentView('home')}
+              onBack={goBack}
               onOpenAddToPlaylist={handleOpenAddToPlaylist}
             />
           )}
@@ -172,7 +230,7 @@ const MainAppContent: React.FC = () => {
           {currentView === 'playlist' && selectedPlaylist && (
             <PlaylistView
               playlist={selectedPlaylist}
-              onBack={() => setCurrentView('home')}
+              onBack={goBack}
               onSelectArtist={handleSelectArtist}
               onOpenAddToPlaylist={handleOpenAddToPlaylist}
             />

@@ -38,57 +38,42 @@
 /* ==========================================================================
    Surfaces
 
-   Replaces the previous glassmorphism layer. Spotify builds depth from a
-   ladder of opaque greys rather than blur, so these are flat fills; the class
-   names are kept so every component re-skins without being rewritten.
+   The comp has no floating panels and no glassmorphism: the navigation column,
+   the content column and the right panel are flush, full-height, and separated
+   only by a change of fill. Depth comes from translucent white laid over
+   whatever is behind — which is why tiles tint with the hero gradient instead
+   of staying a flat grey.
+
+   The previous `.glass-*` classes are gone; nothing referenced them.
    ========================================================================== */
 
-.glass-panel {
-  background: #181818;
-  border: 1px solid transparent;
-}
-
-.glass-elevated {
-  background: #181818;
-  border: 1px solid transparent;
-}
-
-.glass-subtle {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid transparent;
-}
-
-.glass-pill {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid transparent;
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.glass-pill:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.glass-pill.active {
-  background: #ffffff;
-  color: #000000;
-}
-
-/* The app shell: panels float on pure black with a small gutter between. */
+/* A full-height, square-cornered column of the shell. */
 .app-panel {
   background: #121212;
-  border-radius: 8px;
   overflow: hidden;
 }
 
-/* A card that lifts on hover — the standard Spotify content tile. */
+/* The standard content tile: translucent so it picks up the hero behind it.
+   Figma: white @ 4%, 8px radius. */
 .surface-card {
-  background: #181818;
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 8px;
   transition: background-color 0.3s ease;
 }
 
 .surface-card:hover {
-  background: #282828;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* The wide shortcut tile in the greeting grid. Figma: white @ 10%, 6px. */
+.surface-tile {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.surface-tile:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 /* Row in a list (library items, track rows). */
@@ -99,6 +84,25 @@
 
 .surface-row:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* The hero wash behind a greeting or playlist header: a saturated band that
+   fades into the column fill. `--hero` is set per-page from the artwork. */
+.hero-wash {
+  background-image: linear-gradient(
+    180deg,
+    var(--hero, #3333a3) 0%,
+    color-mix(in srgb, var(--hero, #3333a3) 55%, #121212) 42%,
+    #121212 100%
+  );
+}
+
+/* Fallback for browsers without color-mix(): drop to a plain two-stop fade
+   rather than losing the wash entirely. */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .hero-wash {
+    background-image: linear-gradient(180deg, var(--hero, #3333a3) 0%, #121212 100%);
+  }
 }
 
 .glow-primary,
@@ -322,6 +326,52 @@ input[type="range"]:hover::-moz-range-thumb {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ==========================================================================
+   Tile play button
+
+   Figma draws a 62px green circle over the artwork at opacity 0, revealed on
+   hover. It also stays visible whenever the tile is the one playing, so the
+   current item is identifiable without hovering.
+   ========================================================================== */
+
+.tile-fab {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.group:hover .tile-fab,
+.group:focus-within .tile-fab,
+.tile-fab.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Mobile
+
+   The mobile comp docks a mini player above a three-tab bar. Both must clear
+   the home indicator on notched devices, hence the safe-area insets.
+   ========================================================================== */
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Horizontal card scrollers on mobile snap to each tile. */
+.snap-row {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-row > * {
+  scroll-snap-align: start;
 }
 
 /* ==========================================================================
