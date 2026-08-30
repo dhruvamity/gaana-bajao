@@ -89,12 +89,12 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   };
 
   return (
-    <footer className="w-full z-50 bg-background px-4 select-none h-22 flex items-center justify-between gap-4 flex-shrink-0">
+    <footer className="w-full z-50 bg-surface-container-low px-4 sm:px-6 select-none h-player flex items-center justify-between gap-4 flex-shrink-0">
       {/* 1. Left Section: Now Playing Artwork & Meta */}
       <div className="flex items-center gap-3.5 min-w-0 w-1/4 max-w-xs">
         <div 
           onClick={() => setIsNowPlayingOpen(true)}
-          className="relative w-14 h-14 rounded overflow-hidden flex-shrink-0 cursor-pointer group"
+          className="relative w-16 h-16 rounded overflow-hidden flex-shrink-0 cursor-pointer group"
         >
           <CoverArt
             src={currentTrack.coverUrl}
@@ -113,7 +113,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           <button
             type="button"
             onClick={() => setIsNowPlayingOpen(true)}
-            className="block max-w-full text-sm text-white truncate hover:underline text-left"
+            className="block max-w-full text-base text-white truncate hover:underline text-left"
           >
             {currentTrack.title}
           </button>
@@ -125,7 +125,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 onSelectArtist(currentTrack.artistId);
               }
             }}
-            className="block max-w-full text-2xs text-on-surface-variant hover:text-white hover:underline transition-colors truncate text-left"
+            className="block max-w-full text-sm text-on-surface-variant hover:text-white hover:underline transition-colors truncate text-left"
           >
             {currentTrack.artist}
           </button>
@@ -170,7 +170,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             aria-label={isShuffle ? 'Disable shuffle' : 'Enable shuffle'}
             aria-pressed={isShuffle}
           >
-            <Shuffle size={16} />
+            <Shuffle size={19} />
             {isShuffle && <span className="w-1 h-1 rounded-full bg-primary absolute -bottom-0.5 left-1/2 -translate-x-1/2"></span>}
           </button>
 
@@ -180,19 +180,19 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             title="Previous"
             aria-label="Previous track"
           >
-            <SkipBack size={18} fill="currentColor" />
+            <SkipBack size={22} fill="currentColor" />
           </button>
 
           <button 
             onClick={togglePlay}
-            className="w-8 h-8 rounded-full bg-white hover:scale-105 active:scale-100 text-black flex items-center justify-center transition-transform"
+            className="w-12 h-12 rounded-full bg-white hover:scale-105 active:scale-100 text-black flex items-center justify-center transition-transform"
             title={isPlaying ? 'Pause' : 'Play'}
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause size={16} fill="currentColor" />
+              <Pause size={20} fill="currentColor" />
             ) : (
-              <Play size={16} fill="currentColor" className="ml-0.5" />
+              <Play size={20} fill="currentColor" className="ml-0.5" />
             )}
           </button>
 
@@ -202,7 +202,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             title="Next"
             aria-label="Next track"
           >
-            <SkipForward size={18} fill="currentColor" />
+            <SkipForward size={22} fill="currentColor" />
           </button>
 
           <button 
@@ -214,14 +214,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             aria-label={isRepeat ? 'Disable repeat' : 'Enable repeat'}
             aria-pressed={isRepeat}
           >
-            <Repeat size={16} />
+            <Repeat size={19} />
             {isRepeat && <span className="w-1 h-1 rounded-full bg-primary absolute -bottom-0.5 left-1/2 -translate-x-1/2"></span>}
           </button>
         </div>
 
         {/* Timeline Scrubber */}
         <div className="w-full flex items-center gap-2.5">
-          <span className="text-2xs text-on-surface-variant tabular-nums w-10 text-right">
+          <span className="text-xs text-on-surface-variant tabular-nums w-11 text-right">
             {formatTime(progress)}
           </span>
 
@@ -229,12 +229,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             value={progress}
             max={duration}
             onSeek={seek}
+            size="md"
             label="Seek"
             formatValue={(v) => `${formatTime(v)} of ${formatTime(duration)}`}
             className="flex-1"
           />
 
-          <span className="text-2xs text-on-surface-variant tabular-nums w-10">
+          <span className="text-xs text-on-surface-variant tabular-nums w-11">
             {formatTime(duration)}
           </span>
         </div>
@@ -252,7 +253,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             aria-label="Toggle now playing view"
             aria-pressed={isRightSidebarOpen}
           >
-            <PanelRight size={18} />
+            <PanelRight size={20} />
           </button>
         )}
 
@@ -262,7 +263,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           title="Queue"
           aria-label="Open queue"
         >
-          <ListMusic size={18} />
+          <ListMusic size={20} />
         </button>
 
         <button
@@ -271,7 +272,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           title="Connect to a device"
           aria-label="Connect to a device"
         >
-          <Cast size={18} />
+          <Cast size={20} />
         </button>
 
         {/* Volume Controls */}
@@ -293,7 +294,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             value={volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
             aria-label="Volume"
-            className="w-24 cursor-pointer"
+            className="w-[119px] cursor-pointer"
           />
         </div>
 

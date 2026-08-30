@@ -98,6 +98,17 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   };
 
+  /** The comp's "DATE ADDED" column. Tracks predating the field show nothing
+   *  rather than "Jan 1970". */
+  const formatAdded = (ts?: number) => {
+    if (!ts) return '';
+    return new Date(ts).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   // Header tint follows the artwork, so the page reads as one object.
   const heroTint = getCoverTint({
     title: currentPlaylist.title,
@@ -112,22 +123,15 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   );
 
   return (
-    <div className="pb-8">
-      {/* Hero: full-bleed gradient behind the artwork, the way Spotify tints a
-          playlist header from its cover. */}
+    <div className="relative -mt-header pb-8">
+      {/* Hero: a full-bleed wash tinted from the artwork, running up behind the
+          sticky top bar so the page reads as one object. The back control now
+          lives in that bar, so there is no second one here. */}
       <section
-        className="relative px-6 pt-6 pb-6"
+        className="relative px-6 lg:px-8 pt-header pb-6"
         style={{ background: `linear-gradient(180deg, ${heroTint} 0%, rgba(18,18,18,.6) 70%, #121212 100%)` }}
       >
-        <button
-          onClick={onBack}
-          className="mb-6 flex items-center gap-1.5 text-sm font-bold text-white bg-black/40 hover:bg-black/60 px-3 py-1.5 rounded-full transition-colors"
-        >
-          <ChevronLeft size={16} />
-          <span>All Playlists</span>
-        </button>
-
-        <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
+        <div className="flex flex-col md:flex-row items-center md:items-end gap-6 pt-8">
         <div className="relative w-48 h-48 md:w-[232px] md:h-[232px] rounded overflow-hidden shadow-card flex-shrink-0">
           <CoverArt
             src={currentPlaylist.coverUrl}
@@ -140,12 +144,12 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
         </div>
 
         <div className="min-w-0 flex-1 text-center md:text-left">
-          <span className="text-sm font-bold text-white">
-            {currentPlaylist.isAlgorithmic ? 'Curated playlist' : 'Playlist'}
+          <span className="text-2xs font-bold uppercase tracking-label text-white">
+            {currentPlaylist.isAlgorithmic ? 'Curated playlist' : 'Public playlist'}
           </span>
 
           {/* Scales down for long titles instead of truncating them. */}
-          <h1 className="font-bold text-white tracking-tight mt-2 mb-4 break-words [font-size:clamp(2rem,5vw,5rem)] [line-height:1.05]">
+          <h1 className="font-extrabold text-white tracking-display mt-3 mb-4 break-words [font-size:clamp(2rem,5.5vw,6rem)] [line-height:1.05]">
             {currentPlaylist.title}
           </h1>
 
@@ -184,11 +188,11 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       <div className="px-6 py-6 flex items-center gap-6">
           <button
             onClick={() => tracks.length > 0 && playTrack(tracks[0], tracks)}
-            className="w-14 h-14 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-play hover:scale-105 transition-transform"
+            className="w-16 h-16 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-play hover:scale-105 transition-transform"
             title="Play"
             aria-label={`Play ${currentPlaylist.title}`}
           >
-            <Play size={24} fill="currentColor" className="ml-1" />
+            <Play size={28} fill="currentColor" className="ml-1" />
           </button>
 
           <button
@@ -290,10 +294,11 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       <section className="px-6">
         {/* Column header, as in a Spotify track table */}
         {tracks.length > 0 && (
-          <div className="grid grid-cols-[16px_4fr_2fr_minmax(80px,1fr)] gap-4 px-4 pb-2 mb-2 border-b border-white/10 text-2xs uppercase tracking-wider text-on-surface-variant">
+          <div className="grid grid-cols-[16px_4fr_2fr_minmax(80px,1fr)] xl:grid-cols-[16px_4fr_3fr_2fr_minmax(80px,1fr)] gap-4 px-4 pb-2 mb-2 border-b border-white/10 text-2xs uppercase tracking-label text-on-surface-variant">
             <span className="text-right">#</span>
             <span>Title</span>
-            <span className="hidden sm:block">Genre</span>
+            <span className="hidden sm:block">Album</span>
+            <span className="hidden xl:block">Date added</span>
             <span className="flex items-center justify-end pr-12"><Clock size={14} /></span>
           </div>
         )}
@@ -321,7 +326,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
               <div
                 key={track.id}
                 onDoubleClick={() => playOrToggle(track, tracks)}
-                className={`group grid grid-cols-[16px_4fr_2fr_minmax(80px,1fr)] gap-4 items-center px-4 py-2 rounded transition-colors hover:bg-white/10 ${
+                className={`group grid grid-cols-[16px_4fr_2fr_minmax(80px,1fr)] xl:grid-cols-[16px_4fr_3fr_2fr_minmax(80px,1fr)] gap-4 items-center px-4 py-2 rounded transition-colors hover:bg-white/10 ${
                   isTrackActive ? 'bg-white/10' : ''
                 }`}
               >
@@ -367,7 +372,11 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                 </div>
 
                 <span className="hidden sm:block text-sm text-on-surface-variant truncate">
-                  {track.genre}
+                  {track.album || track.genre}
+                </span>
+
+                <span className="hidden xl:block text-sm text-on-surface-variant truncate tabular-nums">
+                  {formatAdded(track.createdAt)}
                 </span>
 
                 <div className="flex items-center justify-end gap-1.5">

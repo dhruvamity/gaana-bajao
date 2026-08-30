@@ -56,10 +56,10 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
   };
 
   return (
-    <aside className="w-84 app-panel bg-surface-container-lowest flex flex-col h-full select-none flex-shrink-0 overflow-y-auto">
+    <aside className="w-rail bg-background flex flex-col h-full select-none flex-shrink-0 overflow-y-auto">
       {/* Top Header */}
-      <div className="px-4 py-3 flex items-center justify-between sticky top-0 bg-surface-container-lowest z-10">
-        <h3 className="text-base font-bold text-white truncate max-w-[220px]">
+      <div className="h-header px-5 flex items-center justify-between sticky top-0 bg-background z-10 flex-shrink-0">
+        <h3 className="text-base font-bold text-white truncate max-w-[240px]">
           {currentTrack.album || currentTrack.title}
         </h3>
 
@@ -73,7 +73,7 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
         </button>
       </div>
 
-      <div className="p-4 space-y-5">
+      <div className="px-5 pb-5 space-y-5">
         {/* Large Album Artwork */}
         <div className="relative aspect-square w-full rounded-lg overflow-hidden shadow-card group">
           <CoverArt

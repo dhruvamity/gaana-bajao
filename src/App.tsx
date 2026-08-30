@@ -200,6 +200,7 @@ const MainAppContent: React.FC = () => {
               onOpenAddToPlaylist={handleOpenAddToPlaylist}
               onSelectLikedSongs={handleSelectLikedSongs}
               onOpenUpload={() => setIsUploadOpen(true)}
+              onSeeAllPlaylists={() => navigate('playlists')}
             />
           )}
 

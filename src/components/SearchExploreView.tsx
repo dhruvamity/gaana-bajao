@@ -20,6 +20,7 @@ import { DatabaseService } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
+import { SectionHeader } from './SectionHeader';
 
 interface SearchExploreViewProps {
   /** Query shared with the navbar search box. */
@@ -141,40 +142,30 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 pb-32 max-w-7xl mx-auto px-4 sm:px-8 pt-6">
-      {/* Search Header */}
+    <div className="space-y-10 pb-32 px-6 lg:px-8 pt-4">
       <div className="space-y-4">
-        <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-          Search & Explore
-        </h1>
-        <p className="text-xs sm:text-sm text-on-surface-variant max-w-2xl">
-          Find songs by title, artist, mood, or natural descriptions.
-        </p>
-
-        {/* Search Input Bar */}
-        <div className="relative flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-primary" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onQueryChange(e.target.value)}
-              placeholder="Search songs, artists, or moods (e.g. 'late night focus')..."
-              className="w-full pl-11 pr-11 py-3 rounded-lg bg-surface-container-high text-white placeholder-on-surface-variant text-xs sm:text-sm focus:outline-none focus:border-primary/60 transition-all"
-            />
-            {isAiProcessing && (
-              <Sparkles size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-primary animate-spin" />
-            )}
-          </div>
+        {/* No search field here: the top bar carries it on this view, as in the
+            comp, and both are bound to the same query state. */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-on-surface-variant flex items-center gap-2">
+            {isAiProcessing && <Sparkles size={15} className="text-primary animate-spin" />}
+            {searchQuery
+              ? `Results for “${searchQuery}”`
+              : 'Browse the catalog, or search from the bar above.'}
+          </span>
 
           <button
             onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-            className={`p-3 rounded-lg bg-white/10 hover:bg-white/20 transition-all ${
-              isFiltersOpen ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white'
+            aria-pressed={isFiltersOpen}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${
+              isFiltersOpen
+                ? 'bg-white text-black'
+                : 'bg-surface-container-high text-white hover:bg-surface-container-highest'
             }`}
-            title="Audio Filters"
+            title="Audio filters"
           >
-            <SlidersHorizontal size={17} />
+            <SlidersHorizontal size={15} />
+            <span>Filters</span>
           </button>
         </div>
 
@@ -226,28 +217,30 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
 
       {/* Dynamic Browse by Genre Tiles */}
       {availableGenres.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-            Browse by Dynamic Catalog Genres
-          </h2>
-          <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
+        <section>
+          <SectionHeader title="Browse all" />
+          <div className="grid gap-6 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
             {availableGenres.map((genre) => {
               const isSelected = selectedGenre?.toLowerCase() === genre.toLowerCase();
               const gradient = getGenreGradient(genre);
+              const count = catalog.filter(
+                t => t.genre?.toLowerCase() === genre.toLowerCase()
+              ).length;
 
               return (
                 <button
                   key={genre}
                   onClick={() => setSelectedGenre(isSelected ? null : genre)}
-                  className={`p-4 rounded-lg bg-gradient-to-br ${gradient} border text-left transition-all relative overflow-hidden group ${
-                    isSelected ? 'border-primary shadow-lg  scale-105' : 'border-white/10 hover:border-white/25'
+                  aria-pressed={isSelected}
+                  className={`relative aspect-[16/13] rounded-lg overflow-hidden p-4 text-left bg-gradient-to-br ${gradient} transition-transform hover:scale-[1.02] ${
+                    isSelected ? 'ring-2 ring-white' : ''
                   }`}
                 >
-                  <span className="text-xs sm:text-sm font-extrabold text-white block truncate">
+                  <span className="block text-xl font-extrabold text-white tracking-title leading-tight line-clamp-3">
                     {genre}
                   </span>
-                  <span className="text-[10px] text-white/70 block mt-0.5">
-                    {catalog.filter(t => t.genre?.toLowerCase() === genre.toLowerCase()).length} tracks
+                  <span className="absolute bottom-3 left-4 text-2xs font-bold uppercase tracking-label text-white/75">
+                    {count} {count === 1 ? 'track' : 'tracks'}
                   </span>
                 </button>
               );
@@ -259,8 +252,8 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
       {/* Search Results List */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">
-            {searchQuery || selectedGenre ? 'Filtered Results' : 'Full Catalog'}
+          <h2 className="text-3xl font-bold text-white tracking-display">
+            {searchQuery || selectedGenre ? 'Results' : 'All tracks'}
           </h2>
           <span className="text-xs text-on-surface-variant font-medium">
             {filteredTracks.length} {filteredTracks.length === 1 ? 'track' : 'tracks'}

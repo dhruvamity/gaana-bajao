@@ -96,21 +96,11 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
   const heroTint = getCoverTint({ title: artist.name, id: artist.id });
 
   return (
-    <div className="pb-8">
-      {/* Back navigation */}
-      <div className="px-6 pt-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm font-bold text-white bg-black/40 hover:bg-black/60 px-3 py-1.5 rounded-full transition-colors"
-        >
-          <ChevronLeft size={16} />
-          <span>Back</span>
-        </button>
-      </div>
-
-      {/* Hero Banner with Glass Overlay */}
+    <div className="relative -mt-header pb-8">
+      {/* Hero banner, running up behind the sticky top bar. Back navigation
+          lives in that bar now, so the page does not carry its own. */}
       <section
-        className="relative overflow-hidden h-72 sm:h-80 flex flex-col justify-end p-6 sm:p-10"
+        className="relative overflow-hidden h-[22rem] sm:h-96 flex flex-col justify-end p-6 pt-header sm:p-10 sm:pt-header"
         style={{ background: `linear-gradient(180deg, ${heroTint} 0%, #121212 100%)` }}
       >
         <CoverArt
@@ -128,7 +118,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
               <TrendingUp size={13} />
               {artist.velocity}
             </div>
-            <h1 className="font-bold text-white tracking-tight [font-size:clamp(2rem,5vw,5rem)] [line-height:1.05]">
+            <h1 className="font-extrabold text-white tracking-display [font-size:clamp(2rem,5.5vw,6rem)] [line-height:1.05]">
               {artist.name}
             </h1>
             <p className="text-xs sm:text-sm text-on-surface-variant flex items-center gap-2">
