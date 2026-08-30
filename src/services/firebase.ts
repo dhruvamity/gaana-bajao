@@ -24,7 +24,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser 
 } from 'firebase/auth';
-import { Track, Playlist, UserProfile, TelemetryEvent, DeviceSession, Artist } from '../types';
+import { Track, Playlist, UserProfile, PublicProfile, TelemetryEvent, DeviceSession, Artist } from '../types';
 import { slugifyArtistId } from '../utils/artistId';
 
 // Default / fallback local storage keys
@@ -32,6 +32,7 @@ const STORAGE_KEYS = {
   TRACKS: 'gaana_tracks',
   PLAYLISTS: 'gaana_playlists',
   USERS: 'gaana_users',
+  PUBLIC_PROFILES: 'gaana_public_profiles',
   EVENTS: 'gaana_telemetry',
   SESSIONS: 'gaana_device_sessions',
   FIREBASE_CONFIG: 'gaana_firebase_config'
@@ -298,22 +299,43 @@ export class DatabaseService {
   /**
    * Fetch all user profiles
    */
-  public static async getUsers(): Promise<UserProfile[]> {
-    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  /**
+   * The directory other users are allowed to see: display name and avatar only.
+   *
+   * This replaces a `getDocs(collection(db, 'users'))` that pulled every user
+   * document into every signed-in browser — emails, liked-track history, taste
+   * vectors and the optional profile PIN included — and cached the lot in
+   * localStorage. Security rules now forbid that read outright, so the
+   * collaborator picker reads this collection instead.
+   */
+  public static async getPublicProfiles(): Promise<PublicProfile[]> {
+    const local: PublicProfile[] = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.PUBLIC_PROFILES) || '[]'
+    );
     if (!db) return local;
 
     try {
-      const snap = await getDocs(collection(db, 'users'));
+      const snap = await getDocs(collection(db, 'publicProfiles'));
       if (!snap.empty) {
-        const remote = snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(remote));
+        const remote = snap.docs.map(d => {
+          const data = d.data() as Partial<PublicProfile>;
+          // Project explicitly rather than spreading: a document that somehow
+          // carries extra fields must not leak them into the app.
+          return { id: d.id, name: data.name || 'Listener', avatar: data.avatar || '' };
+        });
+        localStorage.setItem(STORAGE_KEYS.PUBLIC_PROFILES, JSON.stringify(remote));
         return remote;
       }
       return local;
     } catch (e) {
-      console.warn('Firestore fetch users failed, using local cache', e);
+      console.warn('Firestore fetch public profiles failed, using local cache', e);
       return local;
     }
+  }
+
+  /** The locally cached profiles for this device. Never a whole-collection read. */
+  private static readLocalUsers(): UserProfile[] {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
   }
 
   /**
@@ -508,6 +530,18 @@ export class DatabaseService {
       } catch (e) {
         console.warn('Firestore user sync warning:', e);
       }
+
+      // 3. Publish only the fields other users may see. Written separately so
+      //    the private document never has to be readable to render a name.
+      try {
+        await setDoc(
+          doc(db, 'publicProfiles', user.id),
+          { name: user.name, avatar: user.avatar || '' },
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn('Firestore public profile sync warning:', e);
+      }
     }
   }
 
@@ -518,6 +552,17 @@ export class DatabaseService {
     if (auth) {
       await signOut(auth);
     }
+  }
+
+  /**
+   * Whether Firebase Auth is configured at all.
+   *
+   * When it is not, `onAuthChanged` never fires, so nothing can confirm or
+   * contradict a session that claims a Firebase identity. Callers use this to
+   * refuse such a session rather than trusting it by default.
+   */
+  public static isAuthAvailable(): boolean {
+    return auth !== null;
   }
 
   /**
@@ -548,15 +593,21 @@ export class DatabaseService {
    * Delete a user profile
    */
   public static async deleteUser(userId: string): Promise<void> {
-    const current = await this.getUsers();
-    const updated = current.filter(u => u.id !== userId);
+    const updated = this.readLocalUsers().filter(u => u.id !== userId);
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
 
     if (db) {
+      // Both documents go, or the directory keeps advertising a user that no
+      // longer exists.
       try {
         await deleteDoc(doc(db, 'users', userId));
       } catch (e) {
         console.warn('Failed to delete user in Firestore', e);
+      }
+      try {
+        await deleteDoc(doc(db, 'publicProfiles', userId));
+      } catch (e) {
+        console.warn('Failed to delete public profile in Firestore', e);
       }
     }
   }

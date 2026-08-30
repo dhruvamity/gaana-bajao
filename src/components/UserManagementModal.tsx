@@ -210,7 +210,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               <Clock size={18} className="text-primary flex-shrink-0" />
               <div>
                 <div className="text-[11px] font-bold text-white">{sessionDaysRemaining} Days Left</div>
-                <div className="text-[10px] text-on-surface-variant">30-Day Session Cookie</div>
+                <div className="text-[10px] text-on-surface-variant">Until re-verification</div>
               </div>
             </div>
           </div>

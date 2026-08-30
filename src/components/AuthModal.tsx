@@ -104,7 +104,7 @@ export const AuthModal: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-lg bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
             <ShieldCheck size={15} className="text-emerald-400 flex-shrink-0" />
-            <span>30-Day Cookie Lock</span>
+            <span>Stay Signed In</span>
           </div>
         </div>
 
@@ -171,8 +171,14 @@ export const AuthModal: React.FC = () => {
             )}
           </button>
 
-          <p className="text-[11px] text-on-surface-variant font-medium pt-1">
-            🔒 Logged-in sessions are stored in a secure 30-day browser cookie.
+          {/* The previous copy here read "stored in a secure 30-day browser
+              cookie". The cookie is not Secure, not HttpOnly and not signed, so
+              that sentence described a protection the app does not provide.
+              It now says what actually happens. */}
+          <p className="text-[11px] text-on-surface-variant font-medium pt-1 leading-relaxed">
+            Signing in with Google keeps you signed in for 30 days; your account is
+            verified with Google every time the app loads. Guest sessions stay on
+            this device only and are not backed up.
           </p>
         </div>
 

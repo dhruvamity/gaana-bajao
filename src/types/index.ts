@@ -74,6 +74,19 @@ export interface Playlist {
   updatedAt: number;
 }
 
+/**
+ * The only part of a user that other users may read.
+ *
+ * Kept as its own Firestore collection so a collaborator picker never needs
+ * access to `users/*`, which carries emails, listening history, taste vectors
+ * and an optional PIN.
+ */
+export interface PublicProfile {
+  id: string;
+  name: string;
+  avatar: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Music, Sparkles, Image as ImageIcon } from 'lucide-react';
-import { Playlist, UserProfile } from '../types';
+import { Playlist, PublicProfile } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { DatabaseService } from '../services/firebase';
 import { CoverArt } from './CoverArt';
@@ -24,14 +24,19 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [isCollaborative, setIsCollaborative] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<PublicProfile[]>([]);
   const [selectedCollaboratorIds, setSelectedCollaboratorIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      DatabaseService.getUsers().then(users => setAvailableUsers(users));
-    }
+    if (!isOpen) return;
+    // Reads the public directory (name + avatar), not the users collection.
+    // The previous call pulled every user's full profile into the browser.
+    let cancelled = false;
+    DatabaseService.getPublicProfiles().then(profiles => {
+      if (!cancelled) setAvailableUsers(profiles);
+    });
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   if (!isOpen || !currentUser) return null;
@@ -53,13 +58,17 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
     // Empty means "generate a cover from the playlist identity" — deterministic
     // and unique, rather than one of five stock images shared across playlists.
     const chosenCover = coverUrl.trim();
-    const collaborators = isCollaborative 
-      ? availableUsers.filter(u => u.id === currentUser.id || selectedCollaboratorIds.includes(u.id)).map(u => ({
-          id: u.id,
-          name: u.name,
-          avatar: u.avatar
-        }))
+    const collaborators = isCollaborative
+      ? availableUsers
+          .filter(u => u.id === currentUser.id || selectedCollaboratorIds.includes(u.id))
+          .map(u => ({ id: u.id, name: u.name, avatar: u.avatar }))
       : undefined;
+
+    // Security rules cannot project a field out of an array of maps, so they
+    // gate collaborator writes on this flat list. It was never being written,
+    // which would have made every collaborative playlist read-only for its
+    // collaborators the moment the rules were deployed.
+    const collaboratorIds = collaborators?.map(c => c.id);
 
     const newPlaylist: Playlist = {
       id: `pl-${Date.now()}`,
@@ -70,6 +79,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
       ownerId: currentUser.id,
       ownerName: currentUser.name,
       collaborators,
+      collaboratorIds,
       isAlgorithmic: false,
       createdAt: Date.now(),
       updatedAt: Date.now()

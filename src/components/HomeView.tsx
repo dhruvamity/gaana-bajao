@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Heart, FolderPlus, UploadCloud } from 'lucide-react';
-import { Track, Playlist, Artist } from '../types';
+import { Track, Playlist, Artist, Shelf, TelemetryEvent } from '../types';
 import { DatabaseService } from '../services/firebase';
+import { RecommendationEngine } from '../services/recommendationEngine';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
@@ -36,23 +37,26 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onSeeAllPlaylists
 }) => {
   const { currentTrack, isPlaying, playTrack, togglePlay, logInteraction } = useAudio();
-  const { currentUser, timeOfDay, toggleLikeTrack } = useAuth();
+  const { currentUser, timeOfDay, activityContext, deviceType, toggleLikeTrack } = useAuth();
 
   const [tracks, setTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [events, setEvents] = useState<TelemetryEvent[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   useEffect(() => {
     const loadData = async () => {
-      const [allTracks, allPlaylists, allArtists] = await Promise.all([
+      const [allTracks, allPlaylists, allArtists, allEvents] = await Promise.all([
         DatabaseService.getTracks(),
         DatabaseService.getPlaylists(),
-        DatabaseService.getArtists()
+        DatabaseService.getArtists(),
+        DatabaseService.getTelemetryEvents()
       ]);
       setTracks(allTracks);
       setPlaylists(allPlaylists);
       setArtists(allArtists);
+      setEvents(allEvents);
     };
 
     loadData();
@@ -102,6 +106,26 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     return cards.slice(0, 6);
   }, [currentUser?.likedTrackIds, playlists]);
+
+  /* The recommendation engine drives the top of the page.
+     `generateHomeShelves` was fully implemented but had never been called from
+     anywhere in the app, so every interaction the player recorded fed a model
+     whose output nothing displayed. Empty shelves are dropped: the orchestrator
+     always emits its contextual and discovery shelves even with no catalog. */
+  const shelves = useMemo<Shelf[]>(() => {
+    if (!currentUser || tracks.length === 0) return [];
+    try {
+      return RecommendationEngine.generateHomeShelves(tracks, currentUser, events, {
+        timeOfDay,
+        activity: activityContext,
+        deviceType
+      }).filter(shelf => shelf.tracks.length > 0);
+    } catch (err) {
+      // A ranking failure must not take the home page down with it.
+      console.warn('Shelf generation failed', err);
+      return [];
+    }
+  }, [tracks, events, currentUser, timeOfDay, activityContext, deviceType]);
 
   const filteredTracks = useMemo(() => {
     if (activeCategory === 'all') return tracks;
@@ -206,6 +230,39 @@ export const HomeView: React.FC<HomeViewProps> = ({
             ))}
           </div>
         )}
+
+        {/* Engine-generated shelves. Each card's subtitle carries the reason
+            the engine picked it, so the ranking is legible rather than opaque. */}
+        {shelves.map(shelf => (
+          <section key={shelf.id} className="mb-12">
+            <SectionHeader title={shelf.title} meta={shelf.badge || shelf.subtitle} />
+            <div className={CARD_GRID}>
+              {shelf.tracks.map(track => {
+                const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                return (
+                  <MediaCard
+                    key={`${shelf.id}-${track.id}`}
+                    id={track.id}
+                    title={track.title}
+                    artist={track.artist}
+                    coverUrl={track.coverUrl}
+                    subtitle={track.recommendationReason || track.artist}
+                    isPlaying={isTrackPlaying}
+                    isCurrent={currentTrack?.id === track.id}
+                    onOpen={() => {
+                      if (currentTrack?.id === track.id) togglePlay();
+                      else playTrack(track, shelf.tracks);
+                    }}
+                    onPlay={() => {
+                      if (currentTrack?.id === track.id) togglePlay();
+                      else playTrack(track, shelf.tracks);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))}
 
         {playlists.length > 0 && (
           <section className="mb-12">

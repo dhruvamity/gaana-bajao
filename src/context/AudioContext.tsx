@@ -218,9 +218,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const playTrack = (track: Track, newQueue?: Track[]) => {
     if (!audioEngineRef.current) return;
 
-    // If changing track before 30s with active skip -> log early skip
-    if (currentTrack && currentTrack.id !== track.id && progress < 30 && isPlaying) {
-      logInteractionInternal('skip_early', currentTrack.id, progress);
+    /* Classify the abandoned track through the engine rather than re-deriving
+       the 30s rule here. RecommendationEngine was imported but never called
+       anywhere in the app; this makes the threshold single-sourced, so tuning
+       Thesis 1 actually changes what the app records. */
+    if (currentTrack && currentTrack.id !== track.id && isPlaying) {
+      const { action } = RecommendationEngine.evaluatePlaybackDuration(progress, duration, true);
+      if (action === 'skip_early') {
+        logInteractionInternal('skip_early', currentTrack.id, progress);
+      }
     }
 
     setCurrentTrack(track);
