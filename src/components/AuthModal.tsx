@@ -12,9 +12,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 export const AuthModal: React.FC = () => {
-  const { loginWithGoogle, loginWithDemo } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isDemoLoggingIn, setIsDemoLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
@@ -44,19 +43,6 @@ export const AuthModal: React.FC = () => {
       }
     } finally {
       setIsLoggingIn(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setIsDemoLoggingIn(true);
-    setError(null);
-    try {
-      await loginWithDemo('Dhruv');
-    } catch (err: any) {
-      console.error('Guest login error', err);
-      setError(err.message || 'Failed to initialize session.');
-    } finally {
-      setIsDemoLoggingIn(false);
     }
   };
 
@@ -104,7 +90,7 @@ export const AuthModal: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-lg bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
             <ShieldCheck size={15} className="text-emerald-400 flex-shrink-0" />
-            <span>Stay Signed In</span>
+            <span>Cloud Backed</span>
           </div>
         </div>
 
@@ -124,7 +110,7 @@ export const AuthModal: React.FC = () => {
           {/* Google Sign-in Button */}
           <button
             onClick={handleGoogleLogin}
-            disabled={isLoggingIn || isDemoLoggingIn}
+            disabled={isLoggingIn}
             className="w-full py-3.5 px-6 rounded-lg bg-white hover:bg-white/90 text-black font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xl hover:shadow-card transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
           >
             {isLoggingIn ? (
@@ -155,30 +141,8 @@ export const AuthModal: React.FC = () => {
             )}
           </button>
 
-          {/* Continue as Guest Button */}
-          <button
-            onClick={handleDemoLogin}
-            disabled={isLoggingIn || isDemoLoggingIn}
-            className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all hover:scale-[1.01] cursor-pointer"
-          >
-            {isDemoLoggingIn ? (
-              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <User size={14} className="text-primary" />
-                <span>Continue as Guest (30-Day Session)</span>
-              </>
-            )}
-          </button>
-
-          {/* The previous copy here read "stored in a secure 30-day browser
-              cookie". The cookie is not Secure, not HttpOnly and not signed, so
-              that sentence described a protection the app does not provide.
-              It now says what actually happens. */}
           <p className="text-[11px] text-on-surface-variant font-medium pt-1 leading-relaxed">
-            Signing in with Google keeps you signed in for 30 days; your account is
-            verified with Google every time the app loads. Guest sessions stay on
-            this device only and are not backed up.
+            Signing in with Google keeps your playlists, favorites, and telemetry synced securely across all your devices.
           </p>
         </div>
 

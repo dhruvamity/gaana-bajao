@@ -100,10 +100,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       {footer && <div className="relative z-20 mt-3">{footer}</div>}
 
       {/* Stretched overlay: makes the whole tile one target without wrapping
-          the play button in another button. */}
+          the play button in another button. tabIndex={-1} keeps it out of the
+          tab order so each card costs only one tab stop (the play FAB). */}
       <button
         type="button"
         onClick={onOpen}
+        tabIndex={-1}
         className="absolute inset-0 z-10 rounded-lg"
         aria-label={`Open ${title}`}
       />

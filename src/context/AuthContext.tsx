@@ -2,15 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { UserProfile, TimeOfDay, ActivityContext, DeviceType } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { ConnectSyncService } from '../services/connectSync';
-import { getAuthCookie, setAuthCookie, clearAuthCookie, isGuestId, StoredSession } from '../utils/cookieUtils';
+import { getAuthCookie, setAuthCookie, clearAuthCookie, StoredSession } from '../utils/cookieUtils';
 
 interface AuthContextType {
   currentUser: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   loginWithGoogle: () => Promise<UserProfile>;
-  loginWithGuest: (name?: string) => Promise<UserProfile>;
-  loginWithDemo: (name?: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   updateUserProfile: (user: UserProfile) => Promise<void>;
   updateUserTaste: (genres: string[], vibes: string[]) => Promise<void>;
@@ -85,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: user.id,
       displayName: user.name,
       photoURL: user.avatar,
-      kind: isGuestId(user.id) ? 'guest' : 'firebase',
+      kind: 'firebase',
       expiresAt
     };
     setAuthCookie(session, 30);
@@ -147,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Firebase Auth State Listener
     // IMPORTANT: This is guarded by loginInProgressRef to prevent race conditions
-    // when our explicit login methods (loginWithGoogle, loginWithGuest) are in progress
+    // when explicit Google login is in progress
     const unsubscribe = DatabaseService.onAuthChanged(async (fbUser) => {
       // Skip if an explicit login call is handling this
       if (loginInProgressRef.current || DatabaseService.isLoginInProgress()) {
@@ -155,14 +153,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!fbUser) {
-        /* THIS is what makes the restore cookie safe.
-           Firebase reporting "nobody is signed in" is authoritative for any
-           session that claims a Firebase identity. Previously this branch did
-           not exist, so a cookie naming any uid was never contradicted and the
-           app would render — and attempt writes — as that user indefinitely.
-           Guest sessions are exempt because they never had a Firebase identity
-           to lose; they are local profiles that grant no server-side access. */
-        if (isMounted && currentUserRef.current && !isGuestId(currentUserRef.current.id)) {
+        // Authoritative confirmation: nobody is signed in with Firebase Auth.
+        // Clear any stored session cookie and reset user state.
+        if (isMounted && currentUserRef.current) {
           clearAuthCookie();
           setCurrentUser(null);
           setIsLoading(false);
@@ -236,32 +229,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGuest = async (guestName = 'Guest Listener'): Promise<UserProfile> => {
-    loginInProgressRef.current = true;
-    setIsLoading(true);
-    try {
-      const userProfile = await DatabaseService.loginWithDemo(guestName);
-      setCurrentUser(userProfile);
-      syncSessionCookie(userProfile);
-      
-      if (!userProfile.isOnboarded) {
-        setIsOnboardingOpen(true);
-      }
-      return userProfile;
-    } finally {
-      loginInProgressRef.current = false;
-      setIsLoading(false);
-    }
-  };
-
   const logout = async () => {
     setIsLoading(true);
     try {
       await DatabaseService.logout();
+    } catch (e) {
+      console.warn('signOut() failed; clearing session anyway', e);
+    } finally {
+      // Always clear the session — even if signOut() rejected — so the cookie
+      // does not outlive a failed sign-out.
       clearAuthCookie();
       setCurrentUser(null);
       localStorage.removeItem('gaana_active_user');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -312,8 +291,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!currentUser,
         isLoading,
         loginWithGoogle,
-        loginWithGuest,
-        loginWithDemo: loginWithGuest,
         logout,
         updateUserProfile,
         updateUserTaste,

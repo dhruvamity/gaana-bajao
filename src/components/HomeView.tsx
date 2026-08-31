@@ -47,13 +47,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadData = async () => {
-      const [allTracks, allPlaylists, allArtists, allEvents] = await Promise.all([
+      const [allTracks, allPlaylists, allEvents] = await Promise.all([
         DatabaseService.getTracks(),
         DatabaseService.getPlaylists(),
-        DatabaseService.getArtists(),
         DatabaseService.getTelemetryEvents(currentUser?.id)
       ]);
+      // Pass the already-fetched tracks to getArtists so it doesn't re-fetch.
+      const allArtists = await DatabaseService.getArtists(allTracks);
+
+      if (!isMounted) return;
       setTracks(allTracks);
       setPlaylists(allPlaylists);
       setArtists(allArtists);
@@ -61,6 +66,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     };
 
     loadData();
+    return () => { isMounted = false; };
   }, [currentUser?.id]);
 
   const getGreeting = () => {

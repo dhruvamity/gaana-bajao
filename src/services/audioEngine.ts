@@ -4,6 +4,8 @@ export class AudioEngine {
   private audio: HTMLAudioElement;
   /** Set once the analyser is known to break playback for this engine. */
   private analyserUnavailable = false;
+  /** In-flight enableAnalyser promise; concurrent calls share it. */
+  private _analyserPromise: Promise<boolean> | null = null;
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
@@ -124,6 +126,21 @@ export class AudioEngine {
     if (this.isDestroyed) return false;
     if (this.isContextInitialized) return true;
     if (this.analyserUnavailable) return false;
+    // Re-entrancy guard: if a call is already in flight, share its promise
+    // instead of racing. A second concurrent call used to throw
+    // InvalidStateError on createMediaElementSource, and its catch block
+    // tore down the first call's analyser.
+    if (this._analyserPromise) return this._analyserPromise;
+
+    this._analyserPromise = this._doEnableAnalyser();
+    try {
+      return await this._analyserPromise;
+    } finally {
+      this._analyserPromise = null;
+    }
+  }
+
+  private async _doEnableAnalyser(): Promise<boolean> {
 
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) {

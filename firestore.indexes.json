@@ -1,13 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "tracks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "telemetry",
       "queryScope": "COLLECTION",
       "fields": [

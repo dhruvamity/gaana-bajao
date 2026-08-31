@@ -106,11 +106,87 @@ function stripUndefined<T extends Record<string, any>>(value: T): T {
   return out as T;
 }
 
+export type WriteErrorListener = (message: string, error: unknown) => void;
+const _writeErrorListeners = new Set<WriteErrorListener>();
+
+/**
+ * Register a listener for Firestore write failures so the UI can notify the user.
+ */
+export function onFirestoreWriteError(listener: WriteErrorListener): () => void {
+  _writeErrorListeners.add(listener);
+  return () => { _writeErrorListeners.delete(listener); };
+}
+
+function notifyWriteError(operation: string, error: unknown) {
+  console.warn(`Firestore write failed [${operation}]:`, error);
+  const msg = (error as any)?.message || 'Cloud write failed';
+  _writeErrorListeners.forEach(fn => {
+    try {
+      fn(`Sync failed (${operation}): ${msg}`, error);
+    } catch {
+      // safe
+    }
+  });
+}
+
+/**
+ * Execute a Firestore write with automatic retry and user notification on final failure.
+ */
+async function withWriteRetry<T>(operation: string, fn: () => Promise<T>, maxRetries = 2): Promise<T | null> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      attempt++;
+      if (attempt > maxRetries) {
+        notifyWriteError(operation, err);
+        return null;
+      }
+      await new Promise(res => setTimeout(res, 400 * Math.pow(2, attempt - 1)));
+    }
+  }
+}
+
+/**
+ * Module-level shared cache for getTracks().
+ *
+ * Every component used to call getTracks() independently, causing 9 full
+ * collection reads (891 document reads) on a single cold page load. This
+ * cache deduplicates them: concurrent calls share the same in-flight promise,
+ * and the result is reused until a write invalidates it.
+ */
+let _tracksCache: Track[] | null = null;
+let _tracksCachePromise: Promise<Track[]> | null = null;
+
+/** Drop the cached result so the next getTracks() re-fetches. */
+export function invalidateTracksCache(): void {
+  _tracksCache = null;
+  _tracksCachePromise = null;
+}
+
 export class DatabaseService {
   /**
-   * Fetch all real tracks (purges legacy mock/dummy data automatically)
+   * Fetch all real tracks (purges legacy mock/dummy data automatically).
+   *
+   * Uses a module-level cache: the first caller triggers a fetch, and all
+   * concurrent and subsequent callers share the same result until it is
+   * invalidated by a write (saveTrack, deleteTrack).
    */
   public static async getTracks(): Promise<Track[]> {
+    if (_tracksCache) return _tracksCache;
+    if (_tracksCachePromise) return _tracksCachePromise;
+
+    _tracksCachePromise = this._fetchTracks();
+    try {
+      _tracksCache = await _tracksCachePromise;
+      return _tracksCache;
+    } finally {
+      _tracksCachePromise = null;
+    }
+  }
+
+  private static async _fetchTracks(): Promise<Track[]> {
     let local: Track[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
 
     if (!db) return local;
@@ -138,18 +214,17 @@ export class DatabaseService {
    * Save a new track or update existing
    */
   public static async saveTrack(track: Track): Promise<void> {
+    // Invalidate the shared cache so the next read sees the change.
+    invalidateTracksCache();
+
     // 1. Instant local persistence
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
     const updated = [track, ...local.filter((t: Track) => t.id !== track.id)];
     localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(updated));
 
-    // 2. Background Firestore write
+    // 2. Background Firestore write with retry & feedback
     if (db) {
-      try {
-        await setDoc(doc(db, 'tracks', track.id), stripUndefined(track));
-      } catch (e) {
-        console.warn('Firestore track sync pending/failed', e);
-      }
+      await withWriteRetry('Saving track', () => setDoc(doc(db!, 'tracks', track.id), stripUndefined(track)));
     }
   }
 
@@ -157,16 +232,15 @@ export class DatabaseService {
    * Delete a track
    */
   public static async deleteTrack(trackId: string): Promise<void> {
+    // Invalidate the shared cache so the next read sees the deletion.
+    invalidateTracksCache();
+
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
     const updated = local.filter((t: Track) => t.id !== trackId);
     localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(updated));
 
     if (db) {
-      try {
-        await deleteDoc(doc(db, 'tracks', trackId));
-      } catch (e) {
-        console.warn('Firestore delete track failed', e);
-      }
+      await withWriteRetry('Deleting track', () => deleteDoc(doc(db!, 'tracks', trackId)));
     }
 
     // Remove from playlists
@@ -179,10 +253,13 @@ export class DatabaseService {
   }
 
   /**
-   * Dynamically fetch all artists aggregated from real tracks
+   * Dynamically fetch all artists aggregated from real tracks.
+   *
+   * Accepts an optional pre-fetched tracks array so callers that already have
+   * the catalogue do not trigger another full-collection read.
    */
-  public static async getArtists(): Promise<Artist[]> {
-    const tracks = await this.getTracks();
+  public static async getArtists(prefetchedTracks?: Track[]): Promise<Artist[]> {
+    const tracks = prefetchedTracks ?? await this.getTracks();
     const artistMap = new Map<string, {
       name: string;
       tracks: Track[];
@@ -203,18 +280,24 @@ export class DatabaseService {
       if (track.genre) entry.genres.add(track.genre);
     });
 
-    return Array.from(artistMap.entries()).map(([id, data]) => ({
-      id,
-      name: data.name,
-      avatarUrl: data.tracks[0]?.coverUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
-      bannerUrl: data.tracks[0]?.coverUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
-      bio: `Artist with ${data.tracks.length} track${data.tracks.length !== 1 ? 's' : ''}`,
-      genres: Array.from(data.genres),
-      monthlyListeners: Math.floor(Math.random() * 50000) + 1000,
-      albumIds: [] as string[],
-      topTrackIds: data.tracks.slice(0, 5).map(t => t.id),
-      velocity: `+${(Math.random() * 50).toFixed(1)}% this week`
-    }));
+    return Array.from(artistMap.entries()).map(([id, data]) => {
+      // Derive listeners from actual play counts instead of Math.random().
+      const totalPlays = data.tracks.reduce((sum, t) => sum + (t.playCount || 0), 0);
+      return {
+        id,
+        name: data.name,
+        avatarUrl: data.tracks[0]?.coverUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
+        bannerUrl: data.tracks[0]?.coverUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
+        bio: `Artist with ${data.tracks.length} track${data.tracks.length !== 1 ? 's' : ''}`,
+        genres: Array.from(data.genres),
+        monthlyListeners: totalPlays,
+        albumIds: [] as string[],
+        topTrackIds: data.tracks.slice(0, 5).map(t => t.id),
+        velocity: totalPlays > 0
+          ? `${totalPlays} play${totalPlays !== 1 ? 's' : ''}`
+          : 'New artist'
+      };
+    });
   }
 
   /**
@@ -261,11 +344,7 @@ export class DatabaseService {
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));
 
     if (db) {
-      try {
-        await setDoc(doc(db, 'playlists', playlist.id), stripUndefined(playlist));
-      } catch (e) {
-        console.warn('Firestore playlist sync pending/failed', e);
-      }
+      await withWriteRetry('Saving playlist', () => setDoc(doc(db!, 'playlists', playlist.id), stripUndefined(playlist)));
     }
   }
 
@@ -278,11 +357,7 @@ export class DatabaseService {
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));
 
     if (db) {
-      try {
-        await deleteDoc(doc(db, 'playlists', playlistId));
-      } catch (e) {
-        console.warn('Firestore delete playlist failed', e);
-      }
+      await withWriteRetry('Deleting playlist', () => deleteDoc(doc(db!, 'playlists', playlistId)));
     }
   }
 
@@ -511,36 +586,6 @@ export class DatabaseService {
   }
 
   /**
-   * Demo / Guest account with instant local & Firestore persistence
-   */
-  public static async loginWithDemo(name = 'Dhruv'): Promise<UserProfile> {
-    // Check if there's already a guest session in localStorage to reuse
-    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-    const existingGuest = local.find((u: UserProfile) => u.id.startsWith('user_guest_'));
-    
-    if (existingGuest) {
-      // Reuse existing guest profile (preserves playlists, liked tracks, etc.)
-      return existingGuest;
-    }
-
-    const demoId = 'user_guest_' + Math.random().toString(36).substring(2, 7);
-    const demoProfile: UserProfile = {
-      id: demoId,
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, '')}@gaana-bajao.local`,
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${demoId}`,
-      isOnboarded: true,
-      selectedGenres: [],
-      selectedVibes: [],
-      likedTrackIds: [],
-      savedPlaylistIds: [],
-      recentTrackIds: []
-    };
-    await this.saveUserSync(demoProfile);
-    return demoProfile;
-  }
-
-  /**
    * Helper to sync user profile across localStorage and Firestore
    */
   private static async saveUserSync(user: UserProfile): Promise<void> {
@@ -549,25 +594,21 @@ export class DatabaseService {
     const updated = [user, ...local.filter((u: UserProfile) => u.id !== user.id)];
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
 
-    // 2. Background Firestore write (best-effort)
+    // 2. Background Firestore write (best-effort with retry)
     if (db) {
-      try {
-        await setDoc(doc(db, 'users', user.id), stripUndefined(user), { merge: true });
-      } catch (e) {
-        console.warn('Firestore user sync warning:', e);
-      }
+      await withWriteRetry('Saving user profile', () =>
+        setDoc(doc(db!, 'users', user.id), stripUndefined(user), { merge: true })
+      );
 
       // 3. Publish only the fields other users may see. Written separately so
       //    the private document never has to be readable to render a name.
-      try {
-        await setDoc(
-          doc(db, 'publicProfiles', user.id),
+      await withWriteRetry('Updating public profile', () =>
+        setDoc(
+          doc(db!, 'publicProfiles', user.id),
           { name: user.name, avatar: user.avatar || '' },
           { merge: true }
-        );
-      } catch (e) {
-        console.warn('Firestore public profile sync warning:', e);
-      }
+        )
+      );
     }
   }
 
@@ -625,16 +666,8 @@ export class DatabaseService {
     if (db) {
       // Both documents go, or the directory keeps advertising a user that no
       // longer exists.
-      try {
-        await deleteDoc(doc(db, 'users', userId));
-      } catch (e) {
-        console.warn('Failed to delete user in Firestore', e);
-      }
-      try {
-        await deleteDoc(doc(db, 'publicProfiles', userId));
-      } catch (e) {
-        console.warn('Failed to delete public profile in Firestore', e);
-      }
+      await withWriteRetry('Deleting user', () => deleteDoc(doc(db!, 'users', userId)));
+      await withWriteRetry('Deleting public profile', () => deleteDoc(doc(db!, 'publicProfiles', userId)));
     }
   }
 
@@ -648,11 +681,7 @@ export class DatabaseService {
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events.slice(0, 500)));
 
     if (db) {
-      try {
-        await setDoc(doc(db, 'telemetry', event.id), stripUndefined(event));
-      } catch (e) {
-        console.warn('Firestore telemetry write warning', e);
-      }
+      await withWriteRetry('Telemetry log', () => setDoc(doc(db!, 'telemetry', event.id), stripUndefined(event)));
     }
   }
 
@@ -706,11 +735,9 @@ export class DatabaseService {
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
 
     if (db) {
-      try {
-        await setDoc(doc(db, 'device_sessions', session.id), stripUndefined(session), { merge: true });
-      } catch (e) {
-        console.warn('Firestore device session warning', e);
-      }
+      await withWriteRetry('Device session update', () =>
+        setDoc(doc(db!, 'device_sessions', session.id), stripUndefined(session), { merge: true })
+      );
     }
   }
 

@@ -20,18 +20,18 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   meta
 }) => (
   <div className="flex items-end justify-between gap-4 mb-6">
-    <h2 className="text-3xl font-bold text-white tracking-display truncate">{title}</h2>
+    <h2 className="text-3xl font-bold text-white tracking-display truncate min-w-0">{title}</h2>
 
     {onSeeAll ? (
       <button
         type="button"
         onClick={onSeeAll}
-        className="flex-shrink-0 text-sm font-bold uppercase tracking-label text-on-surface-variant hover:text-white hover:underline transition-colors"
+        className="shrink-0 text-sm font-bold uppercase tracking-label text-on-surface-variant hover:text-white hover:underline transition-colors"
       >
         {seeAllLabel}
       </button>
     ) : meta ? (
-      <span className="flex-shrink-0 text-sm font-bold uppercase tracking-label text-on-surface-variant">
+      <span className="text-sm font-bold uppercase tracking-label text-on-surface-variant truncate">
         {meta}
       </span>
     ) : null}

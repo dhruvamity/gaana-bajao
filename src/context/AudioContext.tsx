@@ -122,6 +122,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const playStartTimeRef = useRef<number>(0);
   const hasLogged30sRef = useRef<boolean>(false);
 
+  // Synchronous state refs to prevent stale closure reads in asynchronous media callbacks (Fix 14)
+  const currentTrackRef = useRef<Track | null>(currentTrack);
+  currentTrackRef.current = currentTrack;
+
+  const isRepeatRef = useRef<boolean>(isRepeat);
+  isRepeatRef.current = isRepeat;
+
+  const queueRef = useRef<Track[]>(queue);
+  queueRef.current = queue;
+
+  const isShuffleRef = useRef<boolean>(isShuffle);
+  isShuffleRef.current = isShuffle;
+
+  const durationRef = useRef<number>(duration);
+  durationRef.current = duration;
+
   // Media events fire asynchronously, long after render. Routing them through a
   // ref lets the engine keep stable listeners for its whole lifetime while the
   // handlers still observe current state — so the engine never has to be rebuilt
@@ -254,14 +270,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     durationPlayed?: number
   ) => {
     const targetTrackId = trackId || currentTrack?.id;
-    if (!targetTrackId) return;
+    if (!targetTrackId || !currentUser?.id) return;
 
     const event: TelemetryEvent = {
       id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      userId: currentUser?.id || 'guest',
+      userId: currentUser.id,
       trackId: targetTrackId,
       action,
-      durationPlayed: durationPlayed || progress,
+      // Read from the ref so this callback doesn't depend on `progress` and
+      // rebuild ~4x/sec on every timeupdate tick.
+      durationPlayed: durationPlayed || progressRef.current,
       timestamp: Date.now(),
       context: {
         timeOfDay,
@@ -271,7 +289,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     await DatabaseService.logTelemetry(event);
-  }, [currentTrack?.id, currentUser?.id, timeOfDay, activityContext, deviceType, progress]);
+  }, [currentTrack?.id, currentUser?.id, timeOfDay, activityContext, deviceType]);
 
   const logInteraction = (type: InteractionType, trackId?: string) => {
     logInteractionInternal(type, trackId);
@@ -353,7 +371,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resume = () => audioEngineRef.current?.play();
 
   const handleTrackEnded = () => {
-    if (isRepeat && currentTrack) {
+    const track = currentTrackRef.current;
+    if (isRepeatRef.current && track) {
       seek(0);
       // A repeat pass is a fresh listen, so the 30s reward can be earned again.
       hasLogged30sRef.current = false;
@@ -369,18 +388,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
    * Skip classification is left entirely to startTrack — see the note there.
    */
   const advance = ({ userInitiated }: { userInitiated: boolean }) => {
-    if (queue.length === 0) return;
-    const currentIndex = queue.findIndex(t => t.id === currentTrack?.id);
+    const curQueue = queueRef.current;
+    const track = currentTrackRef.current;
+    if (curQueue.length === 0) return;
+    const currentIndex = curQueue.findIndex(t => t.id === track?.id);
 
     let nextIndex = currentIndex + 1;
-    if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * queue.length);
+    if (isShuffleRef.current) {
+      nextIndex = Math.floor(Math.random() * curQueue.length);
     }
 
-    if (nextIndex < queue.length) {
-      startTrack(queue[nextIndex], undefined, { userInitiated });
-    } else if (isRepeat) {
-      startTrack(queue[0], undefined, { userInitiated });
+    if (nextIndex < curQueue.length) {
+      startTrack(curQueue[nextIndex], undefined, { userInitiated });
+    } else if (isRepeatRef.current) {
+      startTrack(curQueue[0], undefined, { userInitiated });
     } else {
       setIsPlaying(false);
     }
@@ -456,8 +477,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       },
       onEnded: () => {
-        if (currentTrack) {
-          logInteractionInternal('stream_complete', currentTrack.id, duration);
+        const track = currentTrackRef.current;
+        if (track) {
+          logInteractionInternal('stream_complete', track.id, durationRef.current);
         }
         handleTrackEnded();
       },

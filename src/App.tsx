@@ -1,14 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastContainer } from './components/Toast';
 import { Navbar } from './components/Navbar';
 import { LibrarySidebar } from './components/LibrarySidebar';
 import { NowPlayingSidebar } from './components/NowPlayingSidebar';
 import { HomeView } from './components/HomeView';
-import { SearchExploreView } from './components/SearchExploreView';
-import { PlaylistsDirectoryView } from './components/PlaylistsDirectoryView';
-import { PlaylistView } from './components/PlaylistView';
-import { ArtistView } from './components/ArtistView';
 import { MiniPlayer } from './components/MiniPlayer';
 import { MobileMiniPlayer } from './components/MobileMiniPlayer';
 import { MobileTabBar } from './components/MobileTabBar';
@@ -16,14 +14,30 @@ import { NowPlayingModal } from './components/NowPlayingModal';
 import { ConnectMenu } from './components/ConnectMenu';
 import { TasteOnboarding } from './components/TasteOnboarding';
 import { QueueDrawer } from './components/QueueDrawer';
-import { UploadModal } from './components/UploadModal';
-import { SettingsModal } from './components/SettingsModal';
 import { CreatePlaylistModal } from './components/CreatePlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { UserManagementModal } from './components/UserManagementModal';
 import { AuthModal } from './components/AuthModal';
 import { Playlist, Track } from './types';
 import { Music } from 'lucide-react';
+
+// Lazy-loaded heavy views: these are only pulled when the user navigates to them,
+// reducing the initial bundle from one 890kB chunk.
+const SearchExploreView = React.lazy(() => import('./components/SearchExploreView').then(m => ({ default: m.SearchExploreView })));
+const PlaylistsDirectoryView = React.lazy(() => import('./components/PlaylistsDirectoryView').then(m => ({ default: m.PlaylistsDirectoryView })));
+const PlaylistView = React.lazy(() => import('./components/PlaylistView').then(m => ({ default: m.PlaylistView })));
+const ArtistView = React.lazy(() => import('./components/ArtistView').then(m => ({ default: m.ArtistView })));
+const UploadModal = React.lazy(() => import('./components/UploadModal').then(m => ({ default: m.UploadModal })));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+
+/** Minimal fallback for Suspense while a lazy chunk loads. */
+const ViewFallback = () => (
+  <div className="flex-1 flex items-center justify-center p-12">
+    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center animate-pulse">
+      <Music size={20} className="text-on-surface-variant" />
+    </div>
+  </div>
+);
 
 /** A snapshot of everything that decides what the content column renders. */
 interface ViewState {
@@ -32,15 +46,30 @@ interface ViewState {
   playlist: Playlist | null;
 }
 
+/** Serialisable subset of ViewState for browser history.state. */
+interface SerializedViewState {
+  view: string;
+  artistId: string | null;
+  /** Playlists are JSON-safe objects, so they round-trip through history.state. */
+  playlist: Playlist | null;
+}
+
+function serializeViewState(s: ViewState): SerializedViewState {
+  return { view: s.view, artistId: s.artistId, playlist: s.playlist };
+}
+
 const MainAppContent: React.FC = () => {
   const { currentUser, isAuthenticated, isLoading, isUserModalOpen, setIsUserModalOpen } = useAuth();
   const { currentTrack } = useAudio();
 
-  const [currentView, setCurrentView] = useState<string>('home');
+  // Restore the view from browser history.state on mount (hard refresh).
+  const initial = (typeof window !== 'undefined' && window.history.state) as SerializedViewState | null;
+
+  const [currentView, setCurrentView] = useState<string>(initial?.view || 'home');
   // Owned here so the navbar search box and the search view share one query.
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [selectedArtistId, setSelectedArtistId] = useState<string | null>(initial?.artistId || null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(initial?.playlist || null);
 
   // The content column scrolls independently, and the top bar sitting inside it
   // needs to know when to stop being transparent.
@@ -51,6 +80,10 @@ const MainAppContent: React.FC = () => {
      has no router, so navigation keeps its own stack of view snapshots. */
   const [history, setHistory] = useState<ViewState[]>([]);
 
+  /** True while our own goBack() is driving a history.back() — suppresses the
+   *  popstate handler so the view isn't applied twice. */
+  const isInternalPop = useRef(false);
+
   const pushHistory = () => {
     setHistory(h => [
       ...h.slice(-19),
@@ -58,13 +91,13 @@ const MainAppContent: React.FC = () => {
     ]);
   };
 
-  const applyView = (state: ViewState) => {
+  const applyView = useCallback((state: ViewState) => {
     setCurrentView(state.view);
     setSelectedArtistId(state.artistId);
     setSelectedPlaylist(state.playlist);
     mainRef.current?.scrollTo({ top: 0 });
     setIsScrolled(false);
-  };
+  }, []);
 
   const navigate = (view: string) => {
     if (view === currentView) return;
@@ -72,6 +105,11 @@ const MainAppContent: React.FC = () => {
     setCurrentView(view);
     mainRef.current?.scrollTo({ top: 0 });
     setIsScrolled(false);
+    // Push a browser history entry so Back/Forward work.
+    window.history.pushState(
+      serializeViewState({ view, artistId: selectedArtistId, playlist: selectedPlaylist }),
+      ''
+    );
   };
 
   const goBack = () => {
@@ -81,7 +119,30 @@ const MainAppContent: React.FC = () => {
     const previous = history[history.length - 1];
     setHistory(h => h.slice(0, -1));
     applyView(previous);
+    // Also step the browser history back so the URL bar stays in sync.
+    isInternalPop.current = true;
+    window.history.back();
   };
+
+  // Handle browser Back/Forward buttons via popstate.
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      // If our own goBack() triggered this, the view is already applied.
+      if (isInternalPop.current) {
+        isInternalPop.current = false;
+        return;
+      }
+      const state = e.state as SerializedViewState | null;
+      if (state) {
+        applyView(state);
+      } else {
+        // No state — treat as home (initial entry).
+        applyView({ view: 'home', artistId: null, playlist: null });
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [applyView]);
 
   // Sidebar Layout State
   const [isLibraryCollapsed, setIsLibraryCollapsed] = useState<boolean>(false);
@@ -99,6 +160,10 @@ const MainAppContent: React.FC = () => {
     setCurrentView('artist');
     mainRef.current?.scrollTo({ top: 0 });
     setIsScrolled(false);
+    window.history.pushState(
+      serializeViewState({ view: 'artist', artistId, playlist: selectedPlaylist }),
+      ''
+    );
   };
 
   const handleSelectPlaylist = (playlist: Playlist) => {
@@ -107,6 +172,10 @@ const MainAppContent: React.FC = () => {
     setCurrentView('playlist');
     mainRef.current?.scrollTo({ top: 0 });
     setIsScrolled(false);
+    window.history.pushState(
+      serializeViewState({ view: 'playlist', artistId: selectedArtistId, playlist }),
+      ''
+    );
   };
 
   const handleSelectLikedSongs = () => {
@@ -125,6 +194,10 @@ const MainAppContent: React.FC = () => {
     };
     setSelectedPlaylist(likedPlaylist);
     setCurrentView('playlist');
+    window.history.pushState(
+      serializeViewState({ view: 'playlist', artistId: selectedArtistId, playlist: likedPlaylist }),
+      ''
+    );
   };
 
   const handleOpenAddToPlaylist = (track: Track) => {
@@ -161,6 +234,14 @@ const MainAppContent: React.FC = () => {
        change of fill, and the top bar lives *inside* the content column so the
        page's hero wash can run up behind it. */
     <div className="h-screen w-screen bg-background text-on-background flex flex-col font-body antialiased overflow-hidden">
+      {/* Skip link for keyboard users — jumps over potentially hundreds of
+          media card tab stops straight to the player transport. */}
+      <a
+        href="#player-controls"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-primary focus:text-on-primary focus:rounded-lg focus:text-sm focus:font-bold"
+      >
+        Skip to player controls
+      </a>
       <div className="flex-1 flex overflow-hidden relative min-h-0">
         {/* Left: navigation + library */}
         <div className="hidden md:block h-full min-h-0">
@@ -207,42 +288,50 @@ const MainAppContent: React.FC = () => {
           )}
 
           {currentView === 'search' && (
-            <SearchExploreView
-              query={searchQuery}
-              onQueryChange={setSearchQuery}
-              onSelectArtist={handleSelectArtist}
-              onOpenAddToPlaylist={handleOpenAddToPlaylist}
-            />
+            <Suspense fallback={<ViewFallback />}>
+              <SearchExploreView
+                query={searchQuery}
+                onQueryChange={setSearchQuery}
+                onSelectArtist={handleSelectArtist}
+                onOpenAddToPlaylist={handleOpenAddToPlaylist}
+              />
+            </Suspense>
           )}
 
           {currentView === 'playlists' && (
-            <PlaylistsDirectoryView
-              onSelectPlaylist={handleSelectPlaylist}
-              onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-            />
+            <Suspense fallback={<ViewFallback />}>
+              <PlaylistsDirectoryView
+                onSelectPlaylist={handleSelectPlaylist}
+                onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+              />
+            </Suspense>
           )}
 
           {currentView === 'artist' && selectedArtistId && (
-            <ArtistView
-              artistId={selectedArtistId}
-              onBack={goBack}
-              onOpenAddToPlaylist={handleOpenAddToPlaylist}
-            />
+            <Suspense fallback={<ViewFallback />}>
+              <ArtistView
+                artistId={selectedArtistId}
+                onBack={goBack}
+                onOpenAddToPlaylist={handleOpenAddToPlaylist}
+              />
+            </Suspense>
           )}
 
           {currentView === 'playlist' && selectedPlaylist && (
-            <PlaylistView
-              playlist={selectedPlaylist}
-              onBack={goBack}
-              onSelectArtist={handleSelectArtist}
-              onOpenAddToPlaylist={handleOpenAddToPlaylist}
-            />
+            <Suspense fallback={<ViewFallback />}>
+              <PlaylistView
+                playlist={selectedPlaylist}
+                onBack={goBack}
+                onSelectArtist={handleSelectArtist}
+                onOpenAddToPlaylist={handleOpenAddToPlaylist}
+              />
+            </Suspense>
           )}
         </main>
 
         {/* Right: Now Playing Side Panel (Collapsible) */}
         {isRightSidebarOpen && currentTrack && (
-          <div className="hidden lg:block h-full min-h-0 animate-in fade-in slide-in-from-right-4">
+          <div className="hidden xl:block h-full min-h-0 animate-in fade-in slide-in-from-right-4">
             <NowPlayingSidebar
               onClose={() => setIsRightSidebarOpen(false)}
               onSelectArtist={handleSelectArtist}
@@ -255,7 +344,7 @@ const MainAppContent: React.FC = () => {
       {/* Bottom chrome. The desktop bar and the mobile docked card are
           different objects in the comp, so each renders at its own breakpoint
           rather than one bar trying to be both. */}
-      <div className="hidden md:block">
+      <div id="player-controls" className="hidden md:block">
         <MiniPlayer 
         onSelectArtist={handleSelectArtist}
         onOpenAddToPlaylist={handleOpenAddToPlaylist}
@@ -283,14 +372,18 @@ const MainAppContent: React.FC = () => {
       <QueueDrawer />
 
       {/* Music Upload & Audio Analysis Modal */}
-      <UploadModal
-        isOpen={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
-        onTrackUploaded={(newTrack) => {
-          console.log('Track cataloged:', newTrack.title);
-        }}
-        onPlaylistCreated={handlePlaylistCreated}
-      />
+      {isUploadOpen && (
+        <Suspense fallback={<ViewFallback />}>
+          <UploadModal
+            isOpen={isUploadOpen}
+            onClose={() => setIsUploadOpen(false)}
+            onTrackUploaded={(newTrack) => {
+              console.log('Track cataloged:', newTrack.title);
+            }}
+            onPlaylistCreated={handlePlaylistCreated}
+          />
+        </Suspense>
+      )}
 
       {/* Create Playlist Modal */}
       <CreatePlaylistModal
@@ -311,27 +404,36 @@ const MainAppContent: React.FC = () => {
       />
 
       {/* Settings & Firestore Config Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      {isSettingsOpen && (
+        <Suspense fallback={<ViewFallback />}>
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Listener Profile & Account Modal */}
       <UserManagementModal
         isOpen={isUserModalOpen}
         onClose={() => setIsUserModalOpen(false)}
       />
+
+      {/* Write Error & Sync Feedback Toast Container */}
+      <ToastContainer />
     </div>
   );
 };
 
 export function App() {
   return (
-    <AuthProvider>
-      <AudioProvider>
-        <MainAppContent />
-      </AudioProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AudioProvider>
+          <MainAppContent />
+        </AudioProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
