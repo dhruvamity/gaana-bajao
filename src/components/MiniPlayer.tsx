@@ -16,7 +16,8 @@ import {
   Mic2,
   PanelRight,
   FolderPlus,
-  Radio
+  Radio,
+  AlertTriangle
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -56,6 +57,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
     setIsQueueOpen,
     setIsConnectOpen,
     logInteraction
+  ,
+    playbackError
   } = useAudio();
 
   const { currentUser, toggleLikeTrack } = useAuth();
@@ -117,6 +120,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           >
             {currentTrack.title}
           </button>
+
+          {/* A track whose audio has gone missing used to fail completely
+              silently — the bar sat there showing a pause button over a timer
+              stuck at 0:00. */}
+          {playbackError && (
+            <p role="alert" className="flex items-center gap-1.5 text-2xs font-semibold text-amber-300 mt-0.5">
+              <AlertTriangle size={12} className="flex-shrink-0" />
+              <span className="truncate" title={playbackError}>{playbackError}</span>
+            </p>
+          )}
           <button
             type="button"
             onClick={(e) => {
