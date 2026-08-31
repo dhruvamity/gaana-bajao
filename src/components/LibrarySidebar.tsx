@@ -6,11 +6,15 @@ import {
   Heart,
   Home,
   ChevronLeft,
-  X
+  X,
+  MoreVertical,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { Playlist, Artist, Track } from '../types';
 import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
+import { showToast } from './Toast';
 import { CoverArt } from './CoverArt';
 import { PlaylistCover } from './PlaylistCover';
 
@@ -25,6 +29,7 @@ interface LibrarySidebarProps {
   onOpenCreatePlaylist: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onOpenEditPlaylist?: (playlist: Playlist) => void;
 }
 
 /**
@@ -45,12 +50,14 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
   onSelectLikedSongs,
   onOpenCreatePlaylist,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  onOpenEditPlaylist
 }) => {
   const { currentUser } = useAuth();
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [activeMenuPlId, setActiveMenuPlId] = useState<string | null>(null);
   /* Only the collapsed rail renders artwork — the expanded column lists
      playlists as plain text — so the catalogue needed to build collage covers
      is fetched only when it can actually be seen. */
@@ -279,19 +286,83 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
         <ul className="flex flex-col gap-[18px]">
           {filteredPlaylists.map(pl => {
             const isSelected = currentView === 'playlist' && selectedPlaylistId === pl.id;
+            const isOwner = pl.ownerId === currentUser?.id;
+            const isCollaborator = pl.collaborators?.some(c => c.id === currentUser?.id);
+            const canEdit = !pl.isAlgorithmic && (isOwner || isCollaborator);
+            const isMenuOpen = activeMenuPlId === pl.id;
+
             return (
-              <li key={pl.id}>
+              <li key={pl.id} className="group relative flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => onSelectPlaylist(pl)}
                   aria-current={isSelected ? 'page' : undefined}
                   title={`${pl.title} — playlist by ${pl.ownerName}`}
-                  className={`block w-full text-left text-lg truncate transition-colors ${
-                    isSelected ? 'text-primary' : 'text-on-surface-variant hover:text-white'
+                  className={`block flex-1 text-left text-lg truncate transition-colors ${
+                    isSelected ? 'text-primary font-bold' : 'text-on-surface-variant hover:text-white'
                   }`}
                 >
                   {pl.title}
                 </button>
+
+                {canEdit && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuPlId(isMenuOpen ? null : pl.id);
+                      }}
+                      className={`p-1 rounded-md text-on-surface-variant hover:text-white transition-all ${
+                        isMenuOpen ? 'opacity-100 text-white bg-white/10' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Playlist options"
+                      aria-label="Playlist options"
+                    >
+                      <MoreVertical size={15} />
+                    </button>
+
+                    {isMenuOpen && (
+                      <div 
+                        className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-surface-container-high border border-white/10 shadow-2xl p-1 z-30 animate-in fade-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {onOpenEditPlaylist && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuPlId(null);
+                              onOpenEditPlaylist(pl);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white hover:bg-white/10 transition-colors text-left"
+                          >
+                            <Edit3 size={13} className="text-primary flex-shrink-0" />
+                            <span>Edit Details</span>
+                          </button>
+                        )}
+
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setActiveMenuPlId(null);
+                              if (window.confirm(`Are you sure you want to delete "${pl.title}"?`)) {
+                                await DatabaseService.deletePlaylist(pl.id);
+                                showToast(`Playlist "${pl.title}" deleted.`, 'info');
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-error hover:bg-error/15 transition-colors text-left"
+                          >
+                            <Trash2 size={13} className="flex-shrink-0" />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, Heart, FolderPlus, UploadCloud } from 'lucide-react';
+import { Play, Heart, FolderPlus, UploadCloud, Edit3, Trash2, Share2 } from 'lucide-react';
 import { Track, Playlist, Artist, Shelf, TelemetryEvent } from '../types';
 import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { RecommendationEngine } from '../services/recommendationEngine';
@@ -7,8 +7,9 @@ import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
 import { PlaylistCover } from './PlaylistCover';
-import { MediaCard } from './MediaCard';
+import { MediaCard, CardMenuAction } from './MediaCard';
 import { SectionHeader } from './SectionHeader';
+import { showToast } from './Toast';
 
 interface HomeViewProps {
   onSelectArtist: (artistId: string) => void;
@@ -17,6 +18,7 @@ interface HomeViewProps {
   onSelectLikedSongs?: () => void;
   onOpenUpload?: () => void;
   onSeeAllPlaylists?: () => void;
+  onOpenEditPlaylist?: (playlist: Playlist) => void;
 }
 
 /** The comp's home hero is a saturated indigo fading into the column. */
@@ -35,7 +37,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onOpenAddToPlaylist,
   onSelectLikedSongs,
   onOpenUpload,
-  onSeeAllPlaylists
+  onSeeAllPlaylists,
+  onOpenEditPlaylist
 }) => {
   const { currentTrack, isPlaying, playTrack, togglePlay, logInteraction } = useAudio();
   const { currentUser, timeOfDay, activityContext, deviceType, toggleLikeTrack } = useAuth();
@@ -289,18 +292,52 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <section className="mb-12">
             <SectionHeader title="Your playlists" onSeeAll={onSeeAllPlaylists} />
             <div className={CARD_GRID}>
-              {playlists.map(pl => (
-                <MediaCard
-                  key={pl.id}
-                  id={pl.id}
-                  title={pl.title}
-                  artist={pl.ownerName}
-                  coverUrl={pl.coverUrl}
-                  subtitle={`${pl.trackIds.length} ${pl.trackIds.length === 1 ? 'track' : 'tracks'} · ${pl.ownerName}`}
-                  onOpen={() => onSelectPlaylist(pl)}
-                  onPlay={() => playPlaylist(pl)}
-                />
-              ))}
+              {playlists.map(pl => {
+                const isOwner = pl.ownerId === currentUser?.id;
+                const isCollaborator = pl.collaborators?.some(c => c.id === currentUser?.id);
+                const canEdit = !pl.isAlgorithmic && (isOwner || isCollaborator);
+
+                const menuActions: CardMenuAction[] = [
+                  ...(canEdit && onOpenEditPlaylist ? [{
+                    label: 'Edit Details',
+                    icon: <Edit3 size={14} className="text-primary" />,
+                    onClick: () => onOpenEditPlaylist(pl)
+                  }] : []),
+                  {
+                    label: 'Share Playlist',
+                    icon: <Share2 size={14} className="text-on-surface-variant" />,
+                    onClick: () => {
+                      navigator.clipboard?.writeText(window.location.href);
+                      showToast(`Link to "${pl.title}" copied to clipboard!`, 'info');
+                    }
+                  },
+                  ...(!pl.isAlgorithmic && isOwner ? [{
+                    label: 'Delete Playlist',
+                    icon: <Trash2 size={14} />,
+                    danger: true,
+                    onClick: async () => {
+                      if (window.confirm(`Are you sure you want to delete "${pl.title}"?`)) {
+                        await DatabaseService.deletePlaylist(pl.id);
+                        showToast(`Playlist "${pl.title}" deleted.`, 'info');
+                      }
+                    }
+                  }] : [])
+                ];
+
+                return (
+                  <MediaCard
+                    key={pl.id}
+                    id={pl.id}
+                    title={pl.title}
+                    artist={pl.ownerName}
+                    coverUrl={pl.coverUrl}
+                    subtitle={`${pl.trackIds.length} ${pl.trackIds.length === 1 ? 'track' : 'tracks'} · ${pl.ownerName}`}
+                    menuActions={menuActions}
+                    onOpen={() => onSelectPlaylist(pl)}
+                    onPlay={() => playPlaylist(pl)}
+                  />
+                );
+              })}
             </div>
           </section>
         )}

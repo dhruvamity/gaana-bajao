@@ -15,6 +15,7 @@ import { ConnectMenu } from './components/ConnectMenu';
 import { TasteOnboarding } from './components/TasteOnboarding';
 import { QueueDrawer } from './components/QueueDrawer';
 import { CreatePlaylistModal } from './components/CreatePlaylistModal';
+import { EditPlaylistModal } from './components/EditPlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { UserManagementModal } from './components/UserManagementModal';
 import { AuthModal } from './components/AuthModal';
@@ -152,6 +153,7 @@ const MainAppContent: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState<boolean>(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(null);
 
   const handleSelectArtist = (artistId: string) => {
@@ -254,6 +256,7 @@ const MainAppContent: React.FC = () => {
             onSelectArtist={handleSelectArtist}
             onSelectLikedSongs={handleSelectLikedSongs}
             onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+            onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
             isCollapsed={isLibraryCollapsed}
             onToggleCollapse={() => setIsLibraryCollapsed(!isLibraryCollapsed)}
           />
@@ -284,6 +287,7 @@ const MainAppContent: React.FC = () => {
               onSelectLikedSongs={handleSelectLikedSongs}
               onOpenUpload={() => setIsUploadOpen(true)}
               onSeeAllPlaylists={() => navigate('playlists')}
+              onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
             />
           )}
 
@@ -303,6 +307,7 @@ const MainAppContent: React.FC = () => {
               <PlaylistsDirectoryView
                 onSelectPlaylist={handleSelectPlaylist}
                 onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+                onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
               />
             </Suspense>
           )}
@@ -324,6 +329,7 @@ const MainAppContent: React.FC = () => {
                 onBack={goBack}
                 onSelectArtist={handleSelectArtist}
                 onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
               />
             </Suspense>
           )}
@@ -391,6 +397,24 @@ const MainAppContent: React.FC = () => {
         onClose={() => setIsCreatePlaylistOpen(false)}
         onPlaylistCreated={handlePlaylistCreated}
         initialTrackId={addToPlaylistTrack?.id}
+      />
+
+      {/* Edit Playlist Modal */}
+      <EditPlaylistModal
+        isOpen={Boolean(editingPlaylist)}
+        onClose={() => setEditingPlaylist(null)}
+        playlist={editingPlaylist}
+        onPlaylistUpdated={(updated) => {
+          if (selectedPlaylist?.id === updated.id) {
+            setSelectedPlaylist(updated);
+          }
+        }}
+        onPlaylistDeleted={(deletedId) => {
+          if (selectedPlaylist?.id === deletedId) {
+            setSelectedPlaylist(null);
+            navigate('home');
+          }
+        }}
       />
 
       {/* Add To Playlist Modal */}

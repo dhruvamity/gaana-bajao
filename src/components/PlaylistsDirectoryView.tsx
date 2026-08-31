@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, 
   Plus, 
@@ -8,23 +8,29 @@ import {
   Clock, 
   Trash2, 
   Sparkles,
-  Library
+  Library,
+  MoreVertical,
+  Edit3,
+  Share2
 } from 'lucide-react';
 import { Playlist, Track } from '../types';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAudio } from '../context/AudioContext';
 import { CoverArt } from './CoverArt';
 import { PlaylistCover } from './PlaylistCover';
+import { showToast } from './Toast';
 
 interface PlaylistsDirectoryViewProps {
   onSelectPlaylist: (playlist: Playlist) => void;
   onOpenCreatePlaylist: () => void;
+  onOpenEditPlaylist?: (playlist: Playlist) => void;
 }
 
 export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
   onSelectPlaylist,
-  onOpenCreatePlaylist
+  onOpenCreatePlaylist,
+  onOpenEditPlaylist
 }) => {
   const { currentUser } = useAuth();
   const { playTrack } = useAudio();
@@ -33,6 +39,8 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
   const [allTracks, setAllTracks] = useState<Track[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'created' | 'collaborative' | 'algorithmic'>('all');
+  const [activeMenuPlaylistId, setActiveMenuPlaylistId] = useState<string | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
 
   const loadPlaylists = async () => {
     const [pls, tracks] = await Promise.all([
@@ -45,14 +53,38 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
 
   useEffect(() => {
     loadPlaylists();
+    const unsubscribe = onTracksChanged(() => {
+      loadPlaylists();
+    });
+    return () => unsubscribe();
   }, []);
 
-  const handleDeletePlaylist = async (e: React.MouseEvent, playlistId: string) => {
+  useEffect(() => {
+    if (!activeMenuPlaylistId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
+        setActiveMenuPlaylistId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeMenuPlaylistId]);
+
+  const handleDeletePlaylist = async (e: React.MouseEvent, playlist: Playlist) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this playlist?')) {
-      await DatabaseService.deletePlaylist(playlistId);
-      setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+    setActiveMenuPlaylistId(null);
+    if (window.confirm(`Are you sure you want to delete "${playlist.title}"?`)) {
+      await DatabaseService.deletePlaylist(playlist.id);
+      setPlaylists(prev => prev.filter(p => p.id !== playlist.id));
+      showToast(`Playlist "${playlist.title}" deleted.`, 'info');
     }
+  };
+
+  const handleSharePlaylist = (e: React.MouseEvent, playlist: Playlist) => {
+    e.stopPropagation();
+    setActiveMenuPlaylistId(null);
+    navigator.clipboard?.writeText(window.location.href);
+    showToast(`Link to "${playlist.title}" copied to clipboard!`, 'info');
   };
 
   const handleQuickPlay = (e: React.MouseEvent, playlist: Playlist) => {
@@ -168,9 +200,12 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]">
+        <div ref={menuContainerRef} className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]">
           {filteredPlaylists.map((playlist) => {
             const isOwner = playlist.ownerId === currentUser?.id;
+            const isCollaborator = playlist.collaborators?.some(c => c.id === currentUser?.id);
+            const canEdit = !playlist.isAlgorithmic && (isOwner || isCollaborator);
+            const isMenuOpen = activeMenuPlaylistId === playlist.id;
 
             return (
               <div
@@ -208,16 +243,66 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
                     ) : null}
                   </div>
 
-                  {/* Delete Playlist button for custom playlists */}
-                  {!playlist.isAlgorithmic && isOwner && (
+                  {/* Three-dots menu button */}
+                  <div className="absolute top-2.5 right-2.5 z-20">
                     <button
-                      onClick={(e) => handleDeletePlaylist(e, playlist.id)}
-                      className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/5 text-on-surface-variant hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                      title="Delete Playlist"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuPlaylistId(isMenuOpen ? null : playlist.id);
+                      }}
+                      className={`p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-all shadow-md ${
+                        isMenuOpen ? 'opacity-100 bg-black/80' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Playlist options"
+                      aria-label="Playlist options"
                     >
-                      <Trash2 size={14} />
+                      <MoreVertical size={14} />
                     </button>
-                  )}
+
+                    {/* Options Dropdown */}
+                    {isMenuOpen && (
+                      <div 
+                        className="absolute right-0 top-full mt-1.5 w-44 rounded-xl bg-surface-container-high border border-white/10 shadow-2xl p-1 z-30 animate-in fade-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canEdit && onOpenEditPlaylist && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuPlaylistId(null);
+                              onOpenEditPlaylist(playlist);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-white hover:bg-white/10 transition-colors text-left"
+                          >
+                            <Edit3 size={14} className="text-primary flex-shrink-0" />
+                            <span>Edit Details</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleSharePlaylist(e, playlist)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-white hover:bg-white/10 transition-colors text-left"
+                        >
+                          <Share2 size={14} className="text-on-surface-variant flex-shrink-0" />
+                          <span>Share Playlist</span>
+                        </button>
+
+                        {!playlist.isAlgorithmic && isOwner && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeletePlaylist(e, playlist)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-error hover:bg-error/15 transition-colors text-left"
+                          >
+                            <Trash2 size={14} className="flex-shrink-0" />
+                            <span>Delete Playlist</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Playlist Info */}

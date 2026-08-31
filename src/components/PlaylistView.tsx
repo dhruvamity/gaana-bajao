@@ -16,13 +16,16 @@ import {
   Check,
   ImagePlus,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  MoreHorizontal,
+  Edit3
 } from 'lucide-react';
 import { Playlist, Track } from '../types';
 import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { StorageService } from '../services/storageService';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
+import { showToast } from './Toast';
 import { CoverArt } from './CoverArt';
 import { PlaylistCover } from './PlaylistCover';
 import { getCoverTint, isPlaceholderCover } from '../utils/coverArt';
@@ -32,13 +35,15 @@ interface PlaylistViewProps {
   onBack: () => void;
   onSelectArtist?: (artistId: string) => void;
   onOpenAddToPlaylist?: (track: Track) => void;
+  onOpenEditPlaylist?: (playlist: Playlist) => void;
 }
 
 export const PlaylistView: React.FC<PlaylistViewProps> = ({ 
   playlist, 
   onBack,
   onSelectArtist,
-  onOpenAddToPlaylist
+  onOpenAddToPlaylist,
+  onOpenEditPlaylist
 }) => {
   const { playTrack, playOrToggle, currentTrack, isPlaying, isShuffle, toggleShuffle, logInteraction, addToQueue } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
@@ -48,6 +53,9 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   const [allCatalogTracks, setAllCatalogTracks] = useState<Track[]>([]);
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
   const [isAddTracksOpen, setIsAddTracksOpen] = useState<boolean>(false);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const [trackSearchQuery, setTrackSearchQuery] = useState<string>('');
 
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +105,26 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     setCopiedShare(true);
     setTimeout(() => setCopiedShare(false), 2000);
   };
+
+  const handleDeletePlaylist = async () => {
+    setIsMenuOpen(false);
+    if (window.confirm(`Are you sure you want to delete "${currentPlaylist.title}"?`)) {
+      await DatabaseService.deletePlaylist(currentPlaylist.id);
+      showToast(`Playlist "${currentPlaylist.title}" deleted.`, 'info');
+      onBack();
+    }
+  };
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
 
   const handleRemoveTrack = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
@@ -360,6 +388,79 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
               </span>
             )}
           </button>
+
+          {/* Three-dots Playlist Options Menu */}
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(prev => !prev)}
+              className={`p-2 text-on-surface-variant hover:text-white transition-colors rounded-full hover:bg-white/5 ${
+                isMenuOpen ? 'text-white bg-white/10' : ''
+              }`}
+              title="More playlist options"
+              aria-label="More playlist options"
+            >
+              <MoreHorizontal size={26} />
+            </button>
+
+            {isMenuOpen && (
+              <div 
+                className="absolute left-0 top-full mt-2 w-52 rounded-xl bg-surface-container-high border border-white/10 shadow-2xl p-1.5 z-30 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isOwnerOrCollaborator && onOpenEditPlaylist && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenEditPlaylist(currentPlaylist);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-white hover:bg-white/10 transition-colors text-left"
+                  >
+                    <Edit3 size={15} className="text-primary flex-shrink-0" />
+                    <span>Edit Playlist Details</span>
+                  </button>
+                )}
+
+                {isOwnerOrCollaborator && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsAddTracksOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-white hover:bg-white/10 transition-colors text-left"
+                  >
+                    <Plus size={15} className="text-on-surface-variant flex-shrink-0" />
+                    <span>Add Songs</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    handleShare();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-white hover:bg-white/10 transition-colors text-left"
+                >
+                  <Share2 size={15} className="text-on-surface-variant flex-shrink-0" />
+                  <span>Share Link</span>
+                </button>
+
+                {!currentPlaylist.isAlgorithmic && isOwnerOrCollaborator && (
+                  <button
+                    type="button"
+                    onClick={handleDeletePlaylist}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-error hover:bg-error/15 transition-colors text-left"
+                  >
+                    <Trash2 size={15} className="flex-shrink-0" />
+                    <span>Delete Playlist</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
       </div>
 
       {/* Add Tracks Drawer */}

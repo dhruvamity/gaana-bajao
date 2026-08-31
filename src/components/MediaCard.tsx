@@ -1,6 +1,13 @@
-import React from 'react';
-import { Play, Pause } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Pause, MoreVertical } from 'lucide-react';
 import { CoverArt } from './CoverArt';
+
+export interface CardMenuAction {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+}
 
 interface MediaCardProps {
   /** Identity for the generated-artwork fallback. */
@@ -18,6 +25,8 @@ interface MediaCardProps {
   isPlaying?: boolean;
   /** Tints the title, marking the card the player is currently on. */
   isCurrent?: boolean;
+  /** Optional hover menu actions (e.g. Edit, Delete, Share). */
+  menuActions?: CardMenuAction[];
   /** Rendered under the title row — the like/add controls on track cards. */
   footer?: React.ReactNode;
 }
@@ -45,9 +54,23 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   onPlay,
   isPlaying = false,
   isCurrent = false,
+  menuActions,
   footer
 }) => {
   const isCircle = shape === 'circle';
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isMenuOpen]);
 
   return (
     <div className="group relative surface-card p-[21px] pb-6 min-w-0">
@@ -63,6 +86,54 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           id={id}
           className="w-full aspect-square object-cover"
         />
+
+        {/* Three dots menu button on hover */}
+        {menuActions && menuActions.length > 0 && (
+          <div ref={menuRef} className="absolute top-2 right-2 z-20">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMenuOpen(prev => !prev);
+              }}
+              className={`p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-all shadow-md ${
+                isMenuOpen ? 'opacity-100 bg-black/80' : 'opacity-0 group-hover:opacity-100'
+              }`}
+              title="More options"
+              aria-label="More options"
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isMenuOpen && (
+              <div 
+                className="absolute right-0 top-full mt-1.5 w-44 rounded-xl bg-surface-container-high border border-white/10 shadow-2xl p-1 z-30 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {menuActions.map((action, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMenuOpen(false);
+                      action.onClick();
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors text-left ${
+                      action.danger
+                        ? 'text-error hover:bg-error/15'
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {action.icon && <span className="flex-shrink-0">{action.icon}</span>}
+                    <span className="truncate">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {onPlay && (
           <button
