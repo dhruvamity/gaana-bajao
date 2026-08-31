@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+/** How long the keyboard must be idle before playback position takes over again. */
+const KEY_REPEAT_SETTLE_MS = 250;
+
 interface ScrubberProps {
   /** Current position, in the same unit as `max`. */
   value: number;
@@ -33,6 +36,19 @@ export const Scrubber: React.FC<ScrubberProps> = ({
 }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragValue, setDragValue] = useState<number | null>(null);
+
+  /* Keyboard steps have to accumulate against each other, not against the
+     incoming `value` prop.
+     Every press used to compute its target from `value`; within a single React
+     batch that prop has not updated yet, so a burst of presses all computed the
+     same target and the last write won — holding ArrowLeft moved the playhead
+     one step in total instead of one step per repeat. This holds the
+     uncommitted target between presses and releases it once the keyboard goes
+     quiet, at which point live playback position takes over again. */
+  const keyTargetRef = useRef<number | null>(null);
+  const keyIdleTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(keyIdleTimerRef.current), []);
 
   // While dragging, show the dragged position rather than playback position,
   // otherwise the handle fights the incoming timeupdate events.
@@ -80,22 +96,25 @@ export const Scrubber: React.FC<ScrubberProps> = ({
     if (max <= 0) return;
     const step = max > 60 ? 5 : max / 20;
     const bigStep = max > 60 ? 15 : max / 5;
+
+    // Step from the last uncommitted keyboard target when one is outstanding.
+    const from = keyTargetRef.current ?? value;
     let next: number | null = null;
 
     switch (e.key) {
       case 'ArrowRight':
       case 'ArrowUp':
-        next = Math.min(max, value + step);
+        next = Math.min(max, from + step);
         break;
       case 'ArrowLeft':
       case 'ArrowDown':
-        next = Math.max(0, value - step);
+        next = Math.max(0, from - step);
         break;
       case 'PageUp':
-        next = Math.min(max, value + bigStep);
+        next = Math.min(max, from + bigStep);
         break;
       case 'PageDown':
-        next = Math.max(0, value - bigStep);
+        next = Math.max(0, from - bigStep);
         break;
       case 'Home':
         next = 0;
@@ -107,7 +126,18 @@ export const Scrubber: React.FC<ScrubberProps> = ({
         return;
     }
     e.preventDefault();
+
+    keyTargetRef.current = next;
+    // Show the accumulated target rather than the playback position, the same
+    // way a pointer drag does.
+    setDragValue(next);
     onSeek(next);
+
+    window.clearTimeout(keyIdleTimerRef.current);
+    keyIdleTimerRef.current = window.setTimeout(() => {
+      keyTargetRef.current = null;
+      setDragValue(null);
+    }, KEY_REPEAT_SETTLE_MS);
   };
 
   const height = size === 'md' ? 'h-1.5' : 'h-1';

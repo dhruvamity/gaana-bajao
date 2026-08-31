@@ -14,6 +14,7 @@ import {
 import { initFirebase, DatabaseService } from '../services/firebase';
 import { LibraryRepairPanel } from './LibraryRepairPanel';
 import { TelemetryEvent } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  const { currentUser } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [projectId, setProjectId] = useState('');
   const [storageBucket, setStorageBucket] = useState('');
@@ -41,8 +43,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       } catch (_) {}
     }
 
-    DatabaseService.getTelemetryEvents().then(setTelemetryEvents);
-  }, [isOpen]);
+    DatabaseService.getTelemetryEvents(currentUser?.id).then(setTelemetryEvents);
+  }, [isOpen, currentUser?.id]);
 
   if (!isOpen) return null;
 

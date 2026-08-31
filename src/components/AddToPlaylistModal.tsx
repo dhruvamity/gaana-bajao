@@ -4,6 +4,7 @@ import { Playlist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
+import { PlaylistCover } from './PlaylistCover';
 
 interface AddToPlaylistModalProps {
   isOpen: boolean;
@@ -20,20 +21,25 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [catalogue, setCatalogue] = useState<Track[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [addedPlaylistIds, setAddedPlaylistIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isOpen || !track) return;
 
-    DatabaseService.getPlaylists().then(allPlaylists => {
-      setPlaylists(allPlaylists);
-      const containing = allPlaylists
-        .filter(p => p.trackIds.includes(track.id))
-        .map(p => p.id);
-      setAddedPlaylistIds(containing);
-      setLoading(false);
-    });
+    // Tracks are needed alongside the playlists so each row can show the same
+    // collage cover the playlist shows everywhere else.
+    Promise.all([DatabaseService.getPlaylists(), DatabaseService.getTracks()])
+      .then(([allPlaylists, allTracks]) => {
+        setPlaylists(allPlaylists);
+        setCatalogue(allTracks);
+        const containing = allPlaylists
+          .filter(p => p.trackIds.includes(track.id))
+          .map(p => p.id);
+        setAddedPlaylistIds(containing);
+        setLoading(false);
+      });
   }, [isOpen, track]);
 
   if (!isOpen || !track) return null;
@@ -118,11 +124,10 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <CoverArt
-                        src={playlist.coverUrl}
-                        title={playlist.title}
-                        artist={playlist.ownerName}
-                        id={playlist.id}
+                      <PlaylistCover
+                        playlist={playlist}
+                        tracks={catalogue}
+                        size={80}
                         className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                       />
                       <div className="text-left min-w-0">

@@ -13,12 +13,14 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import { DeviceSession, DeviceType } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { ConnectSyncService } from '../services/connectSync';
 
 export const ConnectMenu: React.FC = () => {
   const { isConnectOpen, setIsConnectOpen, volume, setVolume, isPlaying } = useAudio();
+  const { currentUser } = useAuth();
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [listenTogether, setListenTogether] = useState<boolean>(true);
   const currentDeviceId = ConnectSyncService.getOrCreateDeviceId();
@@ -28,6 +30,7 @@ export const ConnectMenu: React.FC = () => {
 
     const currentDevice: DeviceSession = {
       id: currentDeviceId,
+      userId: currentUser?.id ?? '',
       name: ConnectSyncService.getDeviceName(),
       deviceType: ConnectSyncService.getDeviceType(),
       isCurrentDevice: true,
@@ -56,7 +59,7 @@ export const ConnectMenu: React.FC = () => {
       }
     };
 
-    const unsubscribe = DatabaseService.subscribeDeviceSessions((fetched) => {
+    const unsubscribe = DatabaseService.subscribeDeviceSessions(currentUser?.id, (fetched) => {
       if (fetched.length > 0) {
         setSessions(prev => {
           const current = prev.find(p => p.id === currentDeviceId) || currentDevice;
@@ -70,7 +73,7 @@ export const ConnectMenu: React.FC = () => {
       channel.close();
       unsubscribe();
     };
-  }, [isConnectOpen, currentDeviceId, isPlaying, volume]);
+  }, [isConnectOpen, currentDeviceId, isPlaying, volume, currentUser?.id]);
 
   if (!isConnectOpen) return null;
 

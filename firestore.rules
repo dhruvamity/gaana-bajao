@@ -130,8 +130,39 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Anything not matched above is denied, including the legacy top-level
-    // device_sessions collection which leaked every user's devices.
+    // ------------------------------------------------------- device_sessions
+    // Connect & Handoff. This is a single top-level collection keyed by a
+    // random device id, so the ONLY thing separating one person's devices from
+    // another's is the userId field — which is why it is required on write and
+    // matched on read. Clients must query it as
+    // `where('userId','==',uid)`; an unfiltered listen is refused, because
+    // rules are evaluated against the query rather than the rows it returns.
+    //
+    // Documents are disposable playback state, so a client may replace its own
+    // device record wholesale, but never write one under someone else's id.
+    match /device_sessions/{deviceId} {
+      function validSession(data) {
+        return data.userId is string
+            && data.userId.size() > 0
+            && data.name is string
+            && data.name.size() <= 200
+            && data.progressSeconds is number
+            && data.volume is number
+            && data.lastUpdated is number;
+      }
+
+      allow read: if isSignedIn() && resource.data.userId == uid();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && validSession(request.resource.data);
+      allow update: if isSignedIn()
+                    && resource.data.userId == uid()
+                    && request.resource.data.userId == uid()
+                    && validSession(request.resource.data);
+      allow delete: if isSignedIn() && resource.data.userId == uid();
+    }
+
+    // Anything not matched above is denied.
     match /{document=**} {
       allow read, write: if false;
     }

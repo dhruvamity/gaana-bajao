@@ -35,22 +35,34 @@ export class ConnectSyncService {
   }
 
   /**
-   * Broadcast current device state
+   * Broadcast current device state.
+   *
+   * Does nothing without a signed-in user: the document is gated on `userId`,
+   * so an anonymous broadcast could only ever be written to a collection the
+   * caller has no claim on, and would be denied.
    */
   public static async broadcastState(state: {
+    userId?: string | null;
     isPlaying: boolean;
     currentTrackId?: string;
     progressSeconds: number;
     volume: number;
     isActivePlayback: boolean;
   }): Promise<void> {
+    if (!state.userId) return;
+
     const session: DeviceSession = {
       id: this.deviceId,
+      userId: state.userId,
       name: this.getDeviceName(),
       deviceType: this.getDeviceType(),
       isCurrentDevice: true,
       isActivePlayback: state.isActivePlayback,
-      currentTrackId: state.currentTrackId,
+      // Firestore rejects `undefined` outright, and this is undefined on every
+      // broadcast made before a track is chosen — which used to fail the whole
+      // write with `invalid-argument` and silently disable Connect & Handoff
+      // until playback started.
+      currentTrackId: state.currentTrackId ?? '',
       progressSeconds: state.progressSeconds,
       isPlaying: state.isPlaying,
       volume: state.volume,
