@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Wand2, Search, AlertCircle, Check, Image as ImageIcon, Tag, Loader2, ShieldCheck, Info } from 'lucide-react';
+import { Wand2, Search, AlertCircle, Check, Image as ImageIcon, Tag, Loader2, ShieldCheck, Info, Trash2 } from 'lucide-react';
 import {
   scanLibrary,
   repairLibrary,
+  removeMissingSourceTracks,
   ScanSummary,
-  RepairSummary
+  RepairSummary,
+  RemovalSummary
 } from '../services/libraryRepair';
 
 /**
@@ -36,9 +38,19 @@ const DIAGNOSIS_COPY: Record<string, { label: string; detail: string; tone: 'goo
       'removed when the file was uploaded. Re-uploading the tagged original is the only way to recover it.',
     tone: 'bad'
   },
+  'source-missing': {
+    label: 'Audio file no longer exists',
+    detail:
+      'The media host confirmed the audio object is gone (404). The catalogue entry survives because track ' +
+      'records live in the database, which knows nothing about the stored files — so the track still appears ' +
+      'but can never play. Re-upload the audio, or remove the entry below.',
+    tone: 'bad'
+  },
   'unreadable': {
     label: 'Could not read the file',
-    detail: 'The audio could not be fetched or parsed. Usually a CORS restriction or an expired media URL.',
+    detail:
+      'The audio could not be fetched or parsed, and the host gave no definitive answer. Usually a CORS ' +
+      'restriction or a transient network failure. These are never removed automatically — the file may be fine.',
     tone: 'bad'
   },
   'already-correct': {
@@ -54,6 +66,8 @@ export const LibraryRepairPanel: React.FC = () => {
   const [progress, setProgress] = useState<{ done: number; total: number; label?: string }>({ done: 0, total: 0 });
   const [scan, setScan] = useState<ScanSummary | null>(null);
   const [repair, setRepair] = useState<RepairSummary | null>(null);
+  const [removal, setRemoval] = useState<RemovalSummary | null>(null);
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [restoreArtwork, setRestoreArtwork] = useState(true);
@@ -114,6 +128,27 @@ export const LibraryRepairPanel: React.FC = () => {
     }
   };
 
+  const handleRemoveMissing = async () => {
+    if (!scan) return;
+    setPhase('repairing');
+    setError(null);
+    try {
+      const summary = await removeMissingSourceTracks(
+        scan,
+        (done, total, label) => setProgress({ done, total, label })
+      );
+      setRemoval(summary);
+      setConfirmRemoval(false);
+      // The scan describes tracks that no longer exist, so it must not be
+      // reused to drive another action.
+      setScan(null);
+      setPhase('done');
+    } catch (err: any) {
+      setError(err?.message || 'Could not remove the tracks.');
+      setPhase('scanned');
+    }
+  };
+
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   const busy = phase === 'scanning' || phase === 'repairing';
 
@@ -149,6 +184,19 @@ export const LibraryRepairPanel: React.FC = () => {
           <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
             <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: `${pct}%` }} />
           </div>
+        </div>
+      )}
+
+      {removal && !busy && (
+        <div className="p-3.5 rounded border border-emerald-500/25 bg-emerald-500/10 text-[11px] text-emerald-200 space-y-1">
+          <div className="font-bold flex items-center gap-1.5">
+            <Check size={13} />
+            <span>Removed {removal.removed} of {removal.attempted} unavailable {removal.attempted === 1 ? 'track' : 'tracks'}</span>
+          </div>
+          {removal.failed.length > 0 && (
+            <p className="opacity-80">{removal.failed.length} could not be removed &mdash; {removal.failed[0].error}</p>
+          )}
+          <p className="opacity-70">Scan again to see the library as it stands now.</p>
         </div>
       )}
 
@@ -198,6 +246,59 @@ export const LibraryRepairPanel: React.FC = () => {
                 );
               })}
           </div>
+
+          {/* Removal is separated from repair on purpose: repair recovers data,
+              this discards it. Only tracks the host answered 404/410 for are
+              eligible — never a track that merely failed to load. */}
+          {scan.missingSource > 0 && (
+            <div className="p-3.5 rounded border border-error/30 bg-error/10 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-error text-[11px] font-bold">
+                <AlertCircle size={13} />
+                <span>
+                  {scan.missingSource} {scan.missingSource === 1 ? 'track has' : 'tracks have'} no audio file
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                Their audio is gone from storage, so they can never play. Removing them deletes the
+                catalogue entry only &mdash; the audio is already gone &mdash; and takes them out of any
+                playlist that referenced them. <strong className="text-white">This cannot be undone.</strong>
+                {scan.byDiagnosis['unreadable'] > 0 && (
+                  <> Tracks that merely failed to load are not included.</>
+                )}
+              </p>
+
+              {confirmRemoval ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold text-white">
+                    Remove {scan.missingSource} {scan.missingSource === 1 ? 'entry' : 'entries'}?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveMissing}
+                    className="px-3 py-1.5 rounded bg-error text-white text-[11px] font-bold hover:brightness-110 transition"
+                  >
+                    Yes, remove
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoval(false)}
+                    className="px-3 py-1.5 rounded bg-white/10 text-white text-[11px] font-bold hover:bg-white/20 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemoval(true)}
+                  className="px-3 py-1.5 rounded border border-error/50 text-error text-[11px] font-bold hover:bg-error/15 transition flex items-center gap-1.5"
+                >
+                  <Trash2 size={12} />
+                  <span>Remove unavailable tracks</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {scan.repairable === 0 ? (
             <div className="p-4 rounded bg-surface-container-high/40 border border-white/5 text-xs text-on-surface-variant leading-relaxed">
