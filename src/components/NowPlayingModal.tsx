@@ -23,7 +23,9 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { Track } from '../types';
+import { Scrubber } from './Scrubber';
 import { CoverArt } from './CoverArt';
+import { getCoverTint } from '../utils/coverArt';
 
 interface NowPlayingModalProps {
   onSelectArtist?: (artistId: string) => void;
@@ -86,36 +88,43 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
     logInteraction(isLiked ? 'unlike' : 'like', currentTrack.id);
   };
 
+  /* Screen wash, seeded the same way the generated artwork is, so the tint and
+     the cover always agree. */
+  const screenTint = getCoverTint(
+    { title: currentTrack.title, artist: currentTrack.artist, id: currentTrack.id },
+    { lightness: 24 }
+  );
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-background/95 backdrop-blur-3xl flex flex-col justify-between p-4 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
-      {/* Dynamic Ambient Background Blur */}
-      <div 
-        className="absolute inset-0 opacity-20 pointer-events-none filter blur-[100px] transition-all duration-1000"
-        style={{
-          backgroundImage: `radial-gradient(circle at 50% 30%, ${currentTrack.acoustics.energy > 0.7 ? '#7dd3fc' : '#c8a0f0'} 0%, transparent 60%)`
-        }}
-      />
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto flex flex-col justify-between p-4 pb-safe sm:p-8 animate-in fade-in zoom-in-95 duration-200"
+      style={{
+        /* The mobile comp tints the entire screen from the album art and fades
+           it to black toward the controls. */
+        backgroundImage: `linear-gradient(180deg, ${screenTint} 0%, rgba(0,0,0,.75) 62%, #000000 100%)`
+      }}
+    >
 
       {/* Top Bar Header */}
       <header className="relative z-10 flex items-center justify-between max-w-4xl mx-auto w-full">
         <button
           onClick={() => setIsNowPlayingOpen(false)}
-          className="p-3 rounded-full glass-subtle text-on-surface-variant hover:text-white transition-all"
+          className="p-3 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all"
         >
           <ChevronDown size={24} />
         </button>
 
-        <div className="text-center">
-          <span className="text-[11px] font-semibold text-primary uppercase tracking-widest flex items-center justify-center gap-1.5">
-            <Radio size={13} className="animate-pulse" />
-            Now Playing
+        <div className="text-center min-w-0 px-3">
+          <span className="text-2xs font-bold text-white/70 uppercase tracking-label flex items-center justify-center gap-1.5">
+            <Radio size={12} className="animate-pulse" />
+            Playing from
           </span>
-          <h3 className="text-sm font-semibold text-white truncate max-w-xs">{currentTrack.album}</h3>
+          <h3 className="text-base font-bold text-white truncate">{currentTrack.album || currentTrack.artist}</h3>
         </div>
 
         <button
           onClick={handleShare}
-          className="p-3 rounded-full glass-subtle text-on-surface-variant hover:text-primary transition-all relative"
+          className="p-3 rounded-full bg-white/5 text-on-surface-variant hover:text-primary transition-all relative"
           title="Share"
         >
           <Share2 size={20} />
@@ -130,17 +139,17 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
       {/* Center Section: Album Art & Visualizer / Tabs */}
       <main className="relative z-10 max-w-lg mx-auto w-full my-auto py-6 flex flex-col items-center">
         {/* Album Artwork Card */}
-        <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden glass-elevated border border-white/15 p-2 shadow-2xl group">
+        <div className="relative w-full max-w-[380px] aspect-square rounded overflow-hidden shadow-card group">
           <CoverArt
             src={currentTrack.coverUrl}
             title={currentTrack.title}
             artist={currentTrack.artist}
             id={currentTrack.id}
             loading="eager"
-            className={`w-full h-full object-cover rounded-2xl transition-transform duration-1000 ${isPlaying ? 'scale-105' : 'scale-100'}`}
+            className={`w-full h-full object-cover rounded-lg transition-transform duration-1000 ${isPlaying ? 'scale-105' : 'scale-100'}`}
           />
           {/* Subtle live acoustic badge */}
-          <div className="absolute top-4 left-4 glass-panel px-2.5 py-1 rounded-full text-[10px] font-bold text-primary flex items-center gap-1">
+          <div className="absolute top-4 left-4 bg-surface-container px-2.5 py-1 rounded-full text-[10px] font-bold text-primary flex items-center gap-1">
             <Activity size={12} />
             <span>{currentTrack.acoustics.tempo} BPM • {currentTrack.acoustics.key || '44.1kHz'}</span>
           </div>
@@ -182,19 +191,19 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
 
           {activeTab === 'acoustics' && (
             <div className="grid grid-cols-4 gap-2 w-full px-4 text-center">
-              <div className="glass-subtle p-2 rounded-xl">
+              <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Energy</div>
                 <div className="text-sm font-bold text-primary">{Math.round(currentTrack.acoustics.energy * 100)}%</div>
               </div>
-              <div className="glass-subtle p-2 rounded-xl">
+              <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Valence</div>
                 <div className="text-sm font-bold text-tertiary">{Math.round(currentTrack.acoustics.valence * 100)}%</div>
               </div>
-              <div className="glass-subtle p-2 rounded-xl">
+              <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Danceability</div>
                 <div className="text-sm font-bold text-secondary">{Math.round(currentTrack.acoustics.danceability * 100)}%</div>
               </div>
-              <div className="glass-subtle p-2 rounded-xl">
+              <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Acoustic</div>
                 <div className="text-sm font-bold text-primary-fixed">{Math.round(currentTrack.acoustics.acousticness * 100)}%</div>
               </div>
@@ -203,7 +212,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
 
           {activeTab === 'lyrics' && (
             <div className="flex flex-wrap items-center justify-center gap-1.5 px-4 text-center">
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary border border-white/10">
                 {currentTrack.genre}
               </span>
               {currentTrack.tags.map(tag => (
@@ -238,7 +247,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             {onOpenAddToPlaylist && (
               <button
                 onClick={() => onOpenAddToPlaylist(currentTrack)}
-                className="p-3 rounded-full glass-subtle text-on-surface-variant hover:text-white transition-all"
+                className="p-3 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all"
                 title="Add to Playlist"
               >
                 <FolderPlus size={22} />
@@ -246,19 +255,19 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             )}
             <button
               onClick={handleLike}
-              className={`p-3 rounded-full glass-subtle transition-all ${
+              className={`p-3 rounded-full bg-white/5 transition-all ${
                 isLiked ? 'text-primary scale-110' : 'text-on-surface-variant hover:text-white'
               }`}
               title={isLiked ? 'Unlike' : 'Like'}
             >
-              <Heart size={22} fill={isLiked ? '#7dd3fc' : 'none'} />
+              <Heart size={22} fill={isLiked ? 'currentColor' : 'none'} />
             </button>
           </div>
         </div>
 
         {/* Recommendation Reason Pill */}
         {currentTrack.recommendationReason && (
-          <div className="w-full mt-3 px-3.5 py-2 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2 text-xs text-primary font-medium">
+          <div className="w-full mt-3 px-3.5 py-2 rounded bg-primary/10 border border-white/10 flex items-center gap-2 text-xs text-primary font-medium">
             <Sparkles size={14} className="flex-shrink-0" />
             <span className="truncate">{currentTrack.recommendationReason}</span>
           </div>
@@ -269,23 +278,20 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
       <footer className="relative z-10 max-w-lg mx-auto w-full space-y-4">
         {/* Timeline Scrubber */}
         <div className="space-y-1.5">
-          <div
-            className="relative w-full h-2 bg-white/10 hover:h-3 rounded-full cursor-pointer transition-all group overflow-hidden"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pos = (e.clientX - rect.left) / rect.width;
-              seek(pos * duration);
-            }}
-          >
-            <div
-              className="h-full bg-gradient-to-r from-primary to-primary-fixed rounded-full relative"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
+          <Scrubber
+            value={progress}
+            max={duration}
+            onSeek={seek}
+            label="Seek"
+            formatValue={(v) => `${formatTime(v)} of ${formatTime(duration)}`}
+            size="md"
+          />
 
-          <div className="flex items-center justify-between text-xs text-on-surface-variant font-medium">
+          <div className="flex items-center justify-between text-2xs text-white/70 font-medium tabular-nums">
             <span>{formatTime(progress)}</span>
-            <span>{formatTime(duration)}</span>
+            {/* The comp counts the remaining time down rather than showing the
+                track length, which is already on every list row. */}
+            <span>-{formatTime(Math.max(0, duration - progress))}</span>
           </div>
         </div>
 
@@ -306,15 +312,15 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             className="p-3 text-on-surface-variant hover:text-white transition-colors"
             title="Previous track"
           >
-            <SkipBack size={26} />
+            <SkipBack size={34} fill="currentColor" />
           </button>
 
           <button
             onClick={togglePlay}
-            className="w-16 h-16 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
+            className="w-[67px] h-[67px] rounded-full bg-white hover:bg-white/90 text-black flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
             title={isPlaying ? 'Pause' : 'Play'}
           >
-            {isPlaying ? <Pause size={28} fill="#001f2e" /> : <Play size={28} fill="#001f2e" className="ml-1" />}
+            {isPlaying ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" className="ml-1" />}
           </button>
 
           <button
@@ -322,7 +328,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             className="p-3 text-on-surface-variant hover:text-white transition-colors"
             title="Next track (Skip)"
           >
-            <SkipForward size={26} />
+            <SkipForward size={34} fill="currentColor" />
           </button>
 
           <button

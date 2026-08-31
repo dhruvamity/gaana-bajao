@@ -2,73 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
 @layer base {
+  html {
+    background: #000000;
+  }
+
   body {
-    background: linear-gradient(180deg, #020617 0%, #080e1e 50%, #020617 100%);
+    background: #000000;
     color: #ffffff;
     overflow-x: hidden;
     min-height: 100dvh;
-    background-attachment: fixed;
-    font-family: 'Inter', sans-serif;
+    font-family: Figtree, Inter, system-ui, -apple-system, sans-serif;
+    /* Spotify's type is set tight and heavy; this gets close with Figtree. */
+    letter-spacing: -0.004em;
+  }
+
+  /* Headings are noticeably tighter and heavier than body copy. */
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+
+  /* Keyboard focus must always be visible. 23 components previously set
+     focus:outline-none with exactly one replacement ring between them. */
+  :focus-visible {
+    outline: 2px solid #1ed760;
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
-/* Glassmorphism Styles */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+/* ==========================================================================
+   Surfaces
+
+   The comp has no floating panels and no glassmorphism: the navigation column,
+   the content column and the right panel are flush, full-height, and separated
+   only by a change of fill. Depth comes from translucent white laid over
+   whatever is behind — which is why tiles tint with the hero gradient instead
+   of staying a flat grey.
+
+   The previous `.glass-*` classes are gone; nothing referenced them.
+   ========================================================================== */
+
+/* A full-height, square-cornered column of the shell. */
+.app-panel {
+  background: #121212;
+  overflow: hidden;
 }
 
-.glass-elevated {
-  background: rgba(20, 28, 46, 0.75);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  border: 1px solid rgba(125, 211, 252, 0.2);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+/* The standard content tile: translucent so it picks up the hero behind it.
+   Figma: white @ 4%, 8px radius. */
+.surface-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
 }
 
-.glass-subtle {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+.surface-card:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.glass-pill {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+/* The wide shortcut tile in the greeting grid. Figma: white @ 10%, 6px. */
+.surface-tile {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
 }
 
-.glass-pill:hover {
-  background: rgba(125, 211, 252, 0.12);
-  border-color: rgba(125, 211, 252, 0.3);
+.surface-tile:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
-.glass-pill.active {
-  background: #7dd3fc;
-  color: #001f2e;
-  border-color: #7dd3fc;
-  box-shadow: 0 0 20px rgba(125, 211, 252, 0.35);
+/* Row in a list (library items, track rows). */
+.surface-row {
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
-.glow-primary {
-  box-shadow: 0 0 35px rgba(125, 211, 252, 0.18);
+.surface-row:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
+/* The hero wash behind a greeting or playlist header: a saturated band that
+   fades into the column fill. `--hero` is set per-page from the artwork. */
+.hero-wash {
+  background-image: linear-gradient(
+    180deg,
+    var(--hero, #3333a3) 0%,
+    color-mix(in srgb, var(--hero, #3333a3) 55%, #121212) 42%,
+    #121212 100%
+  );
+}
+
+/* Fallback for browsers without color-mix(): drop to a plain two-stop fade
+   rather than losing the wash entirely. */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .hero-wash {
+    background-image: linear-gradient(180deg, var(--hero, #3333a3) 0%, #121212 100%);
+  }
+}
+
+.glow-primary,
 .glow-tertiary {
-  box-shadow: 0 0 35px rgba(200, 160, 240, 0.18);
+  box-shadow: none;
 }
 
-/* Custom modern scrollbars */
+/* ==========================================================================
+   Scrollbars
+
+   These utilities were used in 9 places but produced no CSS, because
+   tailwind-scrollbar is not installed. Defined directly instead of adding a
+   dependency.
+   ========================================================================== */
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
@@ -76,20 +128,121 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(125, 211, 252, 0.3);
+  background: rgba(255, 255, 255, 0.5);
+  background-clip: content-box;
 }
 
-/* Custom range inputs */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Present so existing `scrollbar-thumb-white/10` markup is inert rather than
+   broken; the thumb colour is set globally above. */
+[class*="scrollbar-thumb-"] {
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* ==========================================================================
+   Controls
+   ========================================================================== */
+
+/* Range inputs: grey track, white fill, thumb only on hover — Spotify's
+   volume and seek behaviour. */
 input[type="range"] {
-  accent-color: #7dd3fc;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
 }
 
-/* Material symbols adjustments */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 12px;
+  width: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb,
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+  height: 12px;
+  width: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 0;
+}
+
+input[type="range"]:hover::-moz-range-thumb {
+  opacity: 1;
+}
+
+/* A progress/scrub track that turns green on hover, like Spotify's. */
+.scrub-track {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.scrub-fill {
+  background: #ffffff;
+}
+
+.scrub-track:hover .scrub-fill {
+  background: #1ed760;
+}
+
+.scrub-thumb {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.scrub-track:hover .scrub-thumb {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   Material Symbols
+   ========================================================================== */
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
@@ -98,12 +251,140 @@ input[type="range"] {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Shimmer animation */
+/* ==========================================================================
+   Entrance animations
+
+   `animate-in`, `fade-in`, `slide-in-from-*` and `zoom-in-95` appear 13 times
+   across the app but come from tailwindcss-animate, which is not installed, so
+   none of them produced any CSS. Implemented here so the markup keeps working
+   without pulling in the dependency.
+   ========================================================================== */
+
+.animate-in {
+  animation-duration: 0.2s;
+  animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: gb-fade-in;
+}
+
+.zoom-in-95 {
+  animation-name: gb-zoom-in;
+}
+
+.slide-in-from-top-2 {
+  animation-name: gb-slide-from-top;
+}
+
+.slide-in-from-right-4 {
+  animation-name: gb-slide-from-right;
+}
+
+.slide-in-from-bottom-4 {
+  animation-name: gb-slide-from-bottom;
+}
+
+@keyframes gb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes gb-zoom-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes gb-slide-from-top {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gb-slide-from-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gb-slide-from-bottom {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
+  0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
+}
+
+/* Line clamping for card descriptions. */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Tile play button
+
+   Figma draws a 62px green circle over the artwork at opacity 0, revealed on
+   hover. It also stays visible whenever the tile is the one playing, so the
+   current item is identifiable without hovering.
+   ========================================================================== */
+
+.tile-fab {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.group:hover .tile-fab,
+.group:focus-within .tile-fab,
+.tile-fab.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Mobile
+
+   The mobile comp docks a mini player above a three-tab bar. Both must clear
+   the home indicator on notched devices, hence the safe-area insets.
+   ========================================================================== */
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Horizontal card scrollers on mobile snap to each tile. */
+.snap-row {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-row > * {
+  scroll-snap-align: start;
+}
+
+/* ==========================================================================
+   Motion preferences
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -83,8 +83,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xl">
-      <div className="relative w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-surface-container border border-white/10 shadow-2xl space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+      <div className="relative w-full max-w-lg p-6 sm:p-8 rounded-lg bg-surface-container-high shadow-card space-y-6">
         
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -101,7 +101,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         </div>
 
         {/* User Card */}
-        <div className="p-6 rounded-2xl bg-surface-container-high/80 border border-white/5 space-y-6">
+        <div className="p-6 rounded-lg bg-surface-container-high/80 border border-white/5 space-y-6">
           <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
             <div className="relative group">
               <CoverArt
@@ -109,10 +109,10 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 title={currentUser.name}
                 id={currentUser.id}
                 loading="eager"
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/40 shadow-lg shadow-primary/20"
+                className="w-20 h-20 rounded-lg object-cover border-2 border-white/20 shadow-lg "
               />
               <label 
-                className="absolute inset-0 bg-black/60 rounded-2xl flex flex-col items-center justify-center text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
+                className="absolute inset-0 bg-black/60 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
                 title="Change Avatar"
               >
                 <Camera size={18} className="mb-0.5" />
@@ -146,7 +146,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 setBio(currentUser.bio || '');
                 setIsEditing(!isEditing);
               }}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/15 text-on-surface-variant hover:text-white transition-colors"
+              className="p-2.5 rounded bg-white/5 hover:bg-white/15 text-on-surface-variant hover:text-white transition-colors"
               title="Edit Profile"
             >
               <Edit3 size={16} />
@@ -162,7 +162,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                  className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                   required
                 />
               </div>
@@ -173,21 +173,21 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Tell us about your music taste..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+                  className="w-full px-3.5 py-2.5 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10"
+                  className="px-3.5 py-1.5 rounded text-xs font-bold text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-1.5 rounded-xl text-xs font-bold text-black bg-primary hover:bg-primary/90 flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded text-xs font-bold text-black bg-primary hover:bg-primary/90 flex items-center gap-1.5"
                 >
                   <Check size={14} />
                   <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
@@ -198,7 +198,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
           {/* Session Status Pill */}
           <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="p-3 rounded-xl bg-surface-container/60 border border-white/5 flex items-center gap-2.5">
+            <div className="p-3 rounded bg-surface-container/60 border border-white/5 flex items-center gap-2.5">
               <ShieldCheck size={18} className="text-emerald-400 flex-shrink-0" />
               <div>
                 <div className="text-[11px] font-bold text-white">Google Verified</div>
@@ -206,20 +206,20 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-surface-container/60 border border-white/5 flex items-center gap-2.5">
+            <div className="p-3 rounded bg-surface-container/60 border border-white/5 flex items-center gap-2.5">
               <Clock size={18} className="text-primary flex-shrink-0" />
               <div>
                 <div className="text-[11px] font-bold text-white">{sessionDaysRemaining} Days Left</div>
-                <div className="text-[10px] text-on-surface-variant">30-Day Session Cookie</div>
+                <div className="text-[10px] text-on-surface-variant">Until re-verification</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Taste Settings Button */}
-        <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-high/40 border border-white/5">
+        <div className="flex items-center justify-between p-4 rounded-lg bg-surface-container-high/40 border border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+            <div className="w-10 h-10 rounded bg-primary/15 text-primary flex items-center justify-center">
               <Sparkles size={20} />
             </div>
             <div>
@@ -237,7 +237,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               onClose();
               setIsOnboardingOpen(true);
             }}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+            className="px-3.5 py-1.5 rounded text-xs font-bold text-primary hover:bg-primary/10 border border-white/10 transition-colors"
           >
             Update
           </button>
@@ -251,7 +251,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
           <button
             onClick={handleLogout}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-error bg-error/10 hover:bg-error/20 border border-error/20 flex items-center gap-2 transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded text-xs font-bold text-error bg-error/10 hover:bg-error/20 border border-error/20 flex items-center gap-2 transition-all cursor-pointer"
           >
             <LogOut size={16} />
             <span>Sign Out</span>

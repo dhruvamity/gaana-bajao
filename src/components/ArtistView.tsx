@@ -18,6 +18,7 @@ import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { FolderPlus } from 'lucide-react';
 import { CoverArt } from './CoverArt';
+import { getCoverTint } from '../utils/coverArt';
 
 interface ArtistViewProps {
   artistId: string;
@@ -30,7 +31,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
   onBack,
   onOpenAddToPlaylist
 }) => {
-  const { playTrack, currentTrack, isPlaying, logInteraction } = useAudio();
+  const { playTrack, playOrToggle, currentTrack, isPlaying, logInteraction } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
 
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -92,19 +93,16 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  return (
-    <div className="space-y-8 pb-32 max-w-7xl mx-auto px-4 lg:px-8 pt-4">
-      {/* Back navigation */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-white glass-pill px-3 py-1.5 rounded-full transition-all"
-      >
-        <ChevronLeft size={16} />
-        <span>Back to Home</span>
-      </button>
+  const heroTint = getCoverTint({ title: artist.name, id: artist.id });
 
-      {/* Hero Banner with Glass Overlay */}
-      <section className="relative overflow-hidden rounded-3xl glass-elevated border border-white/10 h-72 sm:h-96 flex flex-col justify-end p-6 sm:p-10 shadow-2xl">
+  return (
+    <div className="relative -mt-header pb-8">
+      {/* Hero banner, running up behind the sticky top bar. Back navigation
+          lives in that bar now, so the page does not carry its own. */}
+      <section
+        className="relative overflow-hidden h-[22rem] sm:h-96 flex flex-col justify-end p-6 pt-header sm:p-10 sm:pt-header"
+        style={{ background: `linear-gradient(180deg, ${heroTint} 0%, #121212 100%)` }}
+      >
         <CoverArt
           src={artist.bannerUrl}
           title={artist.name}
@@ -112,15 +110,15 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
           loading="eager"
           className="absolute inset-0 w-full h-full object-cover filter brightness-50"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent" />
 
         <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-white/10 text-xs font-bold uppercase tracking-wider">
               <TrendingUp size={13} />
               {artist.velocity}
             </div>
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+            <h1 className="font-extrabold text-white tracking-display [font-size:clamp(2rem,5.5vw,6rem)] [line-height:1.05]">
               {artist.name}
             </h1>
             <p className="text-xs sm:text-sm text-on-surface-variant flex items-center gap-2">
@@ -134,16 +132,16 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={() => artistTracks.length > 0 && playTrack(artistTracks[0], artistTracks)}
-              className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all"
+              className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
-              <Play size={18} fill="#001f2e" />
+              <Play size={18} fill="currentColor" />
               <span>Play All</span>
             </button>
 
             <button
               onClick={handleFollow}
-              className={`px-5 py-3 rounded-2xl text-sm font-semibold glass-pill border transition-all ${
-                isFollowing ? 'bg-primary/20 text-primary border-primary/40' : 'text-white border-white/10 hover:border-white/30'
+              className={`px-5 py-3 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 border transition-all ${
+                isFollowing ? 'bg-primary/20 text-primary border-white/20' : 'text-white border-white/10 hover:border-white/30'
               }`}
             >
               {isFollowing ? 'Following' : 'Follow'}
@@ -151,7 +149,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
             <button
               onClick={handleShare}
-              className="p-3 rounded-2xl glass-pill text-on-surface-variant hover:text-white transition-all relative"
+              className="p-3 rounded-lg bg-white/10 hover:bg-white/20 text-on-surface-variant hover:text-white transition-all relative"
             >
               <Share2 size={18} />
               {copiedShare && (
@@ -165,8 +163,8 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
       </section>
 
       {/* Popular Tracks Section */}
-      <section className="space-y-4">
-        <h3 className="text-2xl font-bold text-white tracking-tight">Popular Releases</h3>
+      <section className="px-6 pt-6 space-y-4">
+        <h3 className="text-2xl font-bold text-white tracking-tight">Popular</h3>
 
         <div className="space-y-2">
           {artistTracks.map((track, idx) => {
@@ -176,7 +174,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             return (
               <div
                 key={track.id}
-                className={`group p-3 sm:px-4 sm:py-3 rounded-2xl glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
+                className={`group p-3 sm:px-4 sm:py-3 rounded-lg bg-surface-container border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
                   isTrackActive ? 'border-primary/50 bg-primary/10' : 'border-white/5'
                 }`}
               >
@@ -185,16 +183,16 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                     {idx + 1}
                   </span>
 
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+                  <div className="relative w-12 h-12 rounded overflow-hidden shadow-md flex-shrink-0">
                     <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
                     <button
-                      onClick={() => playTrack(track, artistTracks)}
+                      onClick={() => playOrToggle(track, artistTracks)}
                       className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       {isTrackActive && isPlaying ? (
-                        <Pause size={16} fill="#ffffff" />
+                        <Pause size={16} fill="currentColor" />
                       ) : (
-                        <Play size={16} fill="#ffffff" className="ml-0.5" />
+                        <Play size={16} fill="currentColor" className="ml-0.5" />
                       )}
                     </button>
                   </div>
@@ -232,11 +230,11 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                       isLiked ? 'text-primary' : 'text-on-surface-variant hover:text-white'
                     }`}
                   >
-                    <Heart size={16} fill={isLiked ? '#7dd3fc' : 'none'} />
+                    <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                   </button>
                   <button
-                    onClick={() => playTrack(track, artistTracks)}
-                    className="p-2 rounded-xl glass-pill text-primary hover:bg-primary/20 transition-all"
+                    onClick={() => playOrToggle(track, artistTracks)}
+                    className="p-2 rounded bg-white/10 hover:bg-white/20 text-primary hover:bg-primary/20 transition-all"
                   >
                     {isTrackActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
                   </button>
@@ -248,20 +246,20 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
       </section>
 
       {/* About & Genres Section */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 p-6 rounded-3xl glass-panel border border-white/10 space-y-3">
+      <section className="px-6 pt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 p-6 rounded-lg bg-surface-container space-y-3">
           <h3 className="text-xl font-bold text-white">About the Artist</h3>
           <p className="text-sm text-on-surface-variant leading-relaxed">{artist.bio}</p>
         </div>
 
-        <div className="p-6 rounded-3xl glass-panel border border-white/10 space-y-3">
+        <div className="p-6 rounded-lg bg-surface-container space-y-3">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <Sparkles size={16} className="text-primary" />
             <span>Genres & Style</span>
           </h3>
           <div className="flex flex-wrap gap-2">
             {artist.genres.map(genre => (
-              <span key={genre} className="glass-pill px-3 py-1 rounded-full text-xs font-semibold text-white">
+              <span key={genre} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-xs font-semibold text-white">
                 {genre}
               </span>
             ))}

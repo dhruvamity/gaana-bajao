@@ -13,7 +13,7 @@
 import { Track } from '../types';
 import { DatabaseService } from './firebase';
 import { StorageService } from './storageService';
-import { extractAudioMetadataFromUrl } from './metadataService';
+import { extractAudioMetadataFromUrl, probeAudioTagsFromUrl, RemoteTagProbe } from './metadataService';
 import { isPlaceholderCover } from '../utils/coverArt';
 import { slugifyArtistId } from '../utils/artistId';
 
@@ -28,8 +28,25 @@ export interface TrackScanResult {
   needsArt: boolean;
   /** Field-level differences worth applying, as `field: current -> proposed`. */
   proposedChanges: Array<{ field: keyof Track; from: string; to: string }>;
+  /** Track predates ownership and cannot be written once rules are enforced. */
+  missingOwner: boolean;
+  /** Why this track yielded nothing, when it yielded nothing. */
+  diagnosis: Diagnosis;
+  detail?: string;
   error?: string;
 }
+
+/**
+ * Distinguishing these matters: a CORS failure, a host that strips metadata,
+ * and a genuinely untagged file all produce "no artwork found", but only one of
+ * them is a bug and each needs a different response.
+ */
+export type Diagnosis =
+  | 'artwork-available'    // embedded art present and recoverable
+  | 'tags-no-artwork'      // tags read, but the file has no picture frame
+  | 'stripped-on-host'     // valid audio, ID3 tag absent from the stored copy
+  | 'unreadable'           // could not fetch or parse
+  | 'already-correct';     // nothing to do
 
 export interface ScanSummary {
   total: number;
@@ -38,6 +55,9 @@ export interface ScanSummary {
   withTags: number;
   needingArt: number;
   repairable: number;
+  missingOwner: number;
+  /** Count of tracks per diagnosis, so the outcome can be explained precisely. */
+  byDiagnosis: Record<Diagnosis, number>;
   results: TrackScanResult[];
 }
 
@@ -77,7 +97,9 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
     hasTags: false,
     hasEmbeddedArt: false,
     needsArt: isPlaceholderCover(track.coverUrl),
-    proposedChanges: []
+    proposedChanges: [],
+    missingOwner: !track.ownerId,
+    diagnosis: 'unreadable'
   };
 
   if (!track.audioUrl) {
@@ -85,8 +107,26 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
     return result;
   }
 
+  let probe: RemoteTagProbe;
   try {
-    const meta = await extractAudioMetadataFromUrl(track.audioUrl);
+    probe = await probeAudioTagsFromUrl(track.audioUrl);
+  } catch (err: any) {
+    result.error = err?.message || 'Could not read tags';
+    return result;
+  }
+
+  result.detail =
+    `HTTP ${probe.httpStatus ?? '-'} | container ${probe.container ?? '-'} | ` +
+    `${(probe.bytesRead / 1024).toFixed(1)} KB read`;
+
+  if (!probe.ok) {
+    result.error = probe.error ?? 'Could not read tags';
+    result.diagnosis = 'unreadable';
+    return result;
+  }
+
+  try {
+    const meta = probe.metadata;
 
     result.hasTags = Boolean(meta.title || meta.artist || meta.album || meta.genre);
     result.hasEmbeddedArt = Boolean(meta.coverBlob);
@@ -110,6 +150,21 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
 
     // The extracted blob is only needed during repair; release the preview URL.
     if (meta.coverDataUrl?.startsWith('blob:')) URL.revokeObjectURL(meta.coverDataUrl);
+
+    if (result.hasEmbeddedArt && result.needsArt) {
+      result.diagnosis = 'artwork-available';
+    } else if (probe.container === 'mpeg-no-tag') {
+      // Valid audio with no tag container at all: either the source never had
+      // one, or it was removed somewhere between upload and delivery.
+      result.diagnosis = 'stripped-on-host';
+      result.detail = (result.detail ? result.detail + ' | ' : '') + (probe.error ?? 'no tag found');
+    } else if (!result.hasEmbeddedArt) {
+      // A tag container exists but holds no picture frame (and possibly no
+      // usable text frames either).
+      result.diagnosis = 'tags-no-artwork';
+    } else {
+      result.diagnosis = 'already-correct';
+    }
   } catch (err: any) {
     result.error = err?.message || 'Could not read tags';
   }
@@ -142,15 +197,26 @@ export async function scanLibrary(
   });
   await Promise.all(workers);
 
+  const byDiagnosis: Record<Diagnosis, number> = {
+    'artwork-available': 0,
+    'tags-no-artwork': 0,
+    'stripped-on-host': 0,
+    'unreadable': 0,
+    'already-correct': 0
+  };
+  for (const r of results) byDiagnosis[r.diagnosis]++;
+
   return {
     total: tracks.length,
     scanned: results.length,
     withEmbeddedArt: results.filter(r => r.hasEmbeddedArt).length,
     withTags: results.filter(r => r.hasTags).length,
     needingArt: results.filter(r => r.needsArt).length,
+    missingOwner: results.filter(r => r.missingOwner).length,
     repairable: results.filter(
-      r => (r.needsArt && r.hasEmbeddedArt) || r.proposedChanges.length > 0
+      r => (r.needsArt && r.hasEmbeddedArt) || r.proposedChanges.length > 0 || r.missingOwner
     ).length,
+    byDiagnosis,
     results
   };
 }
@@ -160,12 +226,19 @@ export interface RepairOptions {
   restoreArtwork: boolean;
   /** Replace filename-derived title/artist/album/genre with real tag values. */
   restoreMetadata: boolean;
+  /**
+   * Stamp ownership onto tracks uploaded before the field existed. Security
+   * rules key writes off ownerId, so without this those tracks become
+   * permanently read-only the moment rules are enforced.
+   */
+  claimOwnership?: { userId: string; userName: string };
 }
 
 export interface RepairSummary {
   attempted: number;
   artworkRestored: number;
   metadataRestored: number;
+  ownershipClaimed: number;
   failed: Array<{ trackId: string; title: string; error: string }>;
 }
 
@@ -185,13 +258,15 @@ export async function repairLibrary(
   const targets = scan.results.filter(
     r =>
       (options.restoreArtwork && r.needsArt && r.hasEmbeddedArt) ||
-      (options.restoreMetadata && r.proposedChanges.length > 0)
+      (options.restoreMetadata && r.proposedChanges.length > 0) ||
+      (!!options.claimOwnership && r.missingOwner)
   );
 
   const summary: RepairSummary = {
     attempted: targets.length,
     artworkRestored: 0,
     metadataRestored: 0,
+    ownershipClaimed: 0,
     failed: []
   };
 
@@ -206,6 +281,13 @@ export async function repairLibrary(
     try {
       let updated: Track = { ...track };
       let changed = false;
+
+      if (options.claimOwnership && !updated.ownerId) {
+        updated.ownerId = options.claimOwnership.userId;
+        updated.ownerName = options.claimOwnership.userName;
+        summary.ownershipClaimed++;
+        changed = true;
+      }
 
       if (options.restoreMetadata && target.proposedChanges.length > 0) {
         for (const change of target.proposedChanges) {

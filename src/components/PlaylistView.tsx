@@ -20,6 +20,7 @@ import { DatabaseService } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
+import { getCoverTint } from '../utils/coverArt';
 
 interface PlaylistViewProps {
   playlist: Playlist;
@@ -34,7 +35,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   onSelectArtist,
   onOpenAddToPlaylist
 }) => {
-  const { playTrack, currentTrack, isPlaying, toggleShuffle, logInteraction, addToQueue } = useAudio();
+  const { playTrack, playOrToggle, currentTrack, isPlaying, isShuffle, toggleShuffle, logInteraction, addToQueue } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
 
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist>(playlist);
@@ -97,6 +98,24 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   };
 
+  /** The comp's "DATE ADDED" column. Tracks predating the field show nothing
+   *  rather than "Jan 1970". */
+  const formatAdded = (ts?: number) => {
+    if (!ts) return '';
+    return new Date(ts).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Header tint follows the artwork, so the page reads as one object.
+  const heroTint = getCoverTint({
+    title: currentPlaylist.title,
+    artist: currentPlaylist.ownerName,
+    id: currentPlaylist.id
+  });
+
   const availableToAdd = allCatalogTracks.filter(t => 
     !currentPlaylist.trackIds.includes(t.id) &&
     (t.title.toLowerCase().includes(trackSearchQuery.toLowerCase()) || 
@@ -104,19 +123,16 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   );
 
   return (
-    <div className="space-y-8 pb-32 max-w-7xl mx-auto px-4 lg:px-8 pt-4">
-      {/* Back button */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-white glass-pill px-3 py-1.5 rounded-full transition-all"
+    <div className="relative -mt-header pb-8">
+      {/* Hero: a full-bleed wash tinted from the artwork, running up behind the
+          sticky top bar so the page reads as one object. The back control now
+          lives in that bar, so there is no second one here. */}
+      <section
+        className="relative px-6 lg:px-8 pt-header pb-6"
+        style={{ background: `linear-gradient(180deg, ${heroTint} 0%, rgba(18,18,18,.6) 70%, #121212 100%)` }}
       >
-        <ChevronLeft size={16} />
-        <span>All Playlists</span>
-      </button>
-
-      {/* Playlist Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl glass-elevated border border-white/10 p-6 sm:p-8 flex flex-col md:flex-row items-center md:items-end gap-6 sm:gap-8 shadow-2xl">
-        <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 group">
+        <div className="flex flex-col md:flex-row items-center md:items-end gap-6 pt-8">
+        <div className="relative w-48 h-48 md:w-[232px] md:h-[232px] rounded overflow-hidden shadow-card flex-shrink-0">
           <CoverArt
             src={currentPlaylist.coverUrl}
             title={currentPlaylist.title}
@@ -127,23 +143,26 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
           />
         </div>
 
-        <div className="space-y-3 min-w-0 flex-1 text-center md:text-left">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 text-xs font-bold uppercase tracking-wider">
-            {currentPlaylist.isAlgorithmic ? 'Curated Playlist' : 'Shared Playlist'}
-          </div>
+        <div className="min-w-0 flex-1 text-center md:text-left">
+          <span className="text-2xs font-bold uppercase tracking-label text-white">
+            {currentPlaylist.isAlgorithmic ? 'Curated playlist' : 'Public playlist'}
+          </span>
 
-          <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight truncate">
+          {/* Scales down for long titles instead of truncating them. */}
+          <h1 className="font-extrabold text-white tracking-display mt-3 mb-4 break-words [font-size:clamp(2rem,5.5vw,6rem)] [line-height:1.05]">
             {currentPlaylist.title}
           </h1>
 
-          <p className="text-xs sm:text-sm text-on-surface-variant max-w-xl">
-            {currentPlaylist.description}
-          </p>
+          {currentPlaylist.description && (
+            <p className="text-sm text-on-surface-variant max-w-xl line-clamp-2">
+              {currentPlaylist.description}
+            </p>
+          )}
 
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs text-on-surface-variant pt-2">
-            <span className="font-semibold text-white">{currentPlaylist.ownerName}</span>
-            <span>•</span>
-            <span>{tracks.length} tracks ({totalMinutes} mins)</span>
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 text-sm text-white pt-2">
+            <span className="font-bold">{currentPlaylist.ownerName}</span>
+            <span className="text-on-surface-variant">&bull;</span>
+            <span className="text-on-surface-variant">{tracks.length} songs, {totalMinutes} min</span>
 
             {/* Collaborator Avatars */}
             {currentPlaylist.collaborators && currentPlaylist.collaborators.length > 0 && (
@@ -162,60 +181,69 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
           </div>
         </div>
 
-        {/* Hero Actions */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
+        </div>
+      </section>
+
+      {/* Action bar */}
+      <div className="px-6 py-6 flex items-center gap-6">
           <button
             onClick={() => tracks.length > 0 && playTrack(tracks[0], tracks)}
-            className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm flex items-center gap-2 shadow-xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all"
+            className="w-16 h-16 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-play hover:scale-105 transition-transform"
+            title="Play"
+            aria-label={`Play ${currentPlaylist.title}`}
           >
-            <Play size={18} fill="#001f2e" />
-            <span>Play</span>
+            <Play size={28} fill="currentColor" className="ml-1" />
           </button>
 
           <button
             onClick={() => {
-              toggleShuffle();
-              if (tracks.length > 0) {
-                const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
-                playTrack(randomTrack, tracks);
-              }
+              if (tracks.length === 0) return;
+              // Turn shuffle ON rather than toggling: pressing "shuffle play"
+              // while shuffle was already on used to switch it off.
+              if (!isShuffle) toggleShuffle();
+              const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
+              playTrack(randomTrack, tracks);
             }}
-            className="p-3 rounded-2xl glass-pill text-on-surface-variant hover:text-white transition-all"
-            title="Shuffle Play"
+            className={`p-2 transition-colors ${isShuffle ? 'text-primary' : 'text-on-surface-variant hover:text-white'}`}
+            title="Shuffle play"
+            aria-label="Shuffle play"
+            aria-pressed={isShuffle}
           >
-            <Shuffle size={18} />
+            <Shuffle size={26} />
           </button>
 
           {isOwnerOrCollaborator && (
             <button
               onClick={() => setIsAddTracksOpen(!isAddTracksOpen)}
-              className={`p-3 rounded-2xl glass-pill transition-all ${
-                isAddTracksOpen ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white'
+              className={`p-2 transition-colors ${
+                isAddTracksOpen ? 'text-primary' : 'text-on-surface-variant hover:text-white'
               }`}
-              title="Add Tracks"
+              title="Add tracks"
+              aria-label="Add tracks"
+              aria-expanded={isAddTracksOpen}
             >
-              <Plus size={18} />
+              <Plus size={26} />
             </button>
           )}
 
           <button
             onClick={handleShare}
-            className="p-3 rounded-2xl glass-pill text-on-surface-variant hover:text-white transition-all relative"
-            title="Share Playlist"
+            className="p-2 text-on-surface-variant hover:text-white transition-colors relative"
+            title="Share playlist"
+            aria-label="Share playlist"
           >
-            <Share2 size={18} />
+            <Share2 size={22} />
             {copiedShare && (
-              <span className="absolute -top-8 right-0 bg-primary text-on-primary px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap shadow-lg">
+              <span className="absolute -top-8 right-0 bg-white text-black px-2 py-0.5 rounded text-2xs font-bold whitespace-nowrap">
                 Copied!
               </span>
             )}
           </button>
-        </div>
-      </section>
+      </div>
 
       {/* Add Tracks Drawer */}
       {isAddTracksOpen && (
-        <section className="p-6 rounded-3xl glass-elevated border border-primary/30 space-y-4 animate-in fade-in slide-in-from-top-2">
+        <section className="mx-6 mb-6 p-6 rounded-lg bg-surface-container space-y-4 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Plus size={16} className="text-primary" />
@@ -231,15 +259,15 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
               value={trackSearchQuery}
               onChange={(e) => setTrackSearchQuery(e.target.value)}
               placeholder="Search catalog to add songs..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-panel border border-white/10 text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface-container text-white text-xs placeholder-on-surface-variant focus:outline-none focus:border-primary"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-52 overflow-y-auto pr-1">
+          <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] max-h-52 overflow-y-auto pr-1">
             {availableToAdd.map(t => (
               <div
                 key={t.id}
-                className="p-2.5 rounded-2xl glass-panel border border-white/5 flex items-center justify-between gap-3"
+                className="p-2.5 rounded-lg bg-surface-container flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <CoverArt src={t.coverUrl} title={t.title} artist={t.artist} id={t.id} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
@@ -263,18 +291,29 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       )}
 
       {/* Playlist Tracks List */}
-      <section className="space-y-2">
+      <section className="px-6">
+        {/* Column header, as in a Spotify track table */}
+        {tracks.length > 0 && (
+          <div className="grid grid-cols-[16px_4fr_2fr_minmax(80px,1fr)] xl:grid-cols-[16px_4fr_3fr_2fr_minmax(80px,1fr)] gap-4 px-4 pb-2 mb-2 border-b border-white/10 text-2xs uppercase tracking-label text-on-surface-variant">
+            <span className="text-right">#</span>
+            <span>Title</span>
+            <span className="hidden sm:block">Album</span>
+            <span className="hidden xl:block">Date added</span>
+            <span className="flex items-center justify-end pr-12"><Clock size={14} /></span>
+          </div>
+        )}
+
         {tracks.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl glass-subtle border border-white/5 space-y-2">
+          <div className="p-12 text-center rounded-lg bg-surface-container space-y-2">
             <Music size={32} className="mx-auto text-on-surface-variant opacity-40" />
             <p className="text-sm font-semibold text-white">No tracks in this playlist</p>
             {isOwnerOrCollaborator && (
               <button
                 onClick={() => setIsAddTracksOpen(true)}
-                className="mt-2 px-4 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs inline-flex items-center gap-1.5"
+                className="mt-3 px-6 py-2.5 rounded-full bg-white hover:scale-105 text-black font-bold text-sm inline-flex items-center gap-1.5 transition-transform"
               >
-                <Plus size={14} />
-                <span>Add Songs</span>
+                <Plus size={16} />
+                <span>Add songs</span>
               </button>
             )}
           </div>
@@ -286,54 +325,68 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
             return (
               <div
                 key={track.id}
-                className={`group p-3 sm:px-4 sm:py-3 rounded-2xl glass-panel border transition-all flex items-center justify-between gap-4 hover:border-primary/30 hover:bg-white/5 ${
-                  isTrackActive ? 'border-primary/50 bg-primary/10' : 'border-white/5'
+                onDoubleClick={() => playOrToggle(track, tracks)}
+                className={`group grid grid-cols-[16px_4fr_2fr_minmax(80px,1fr)] xl:grid-cols-[16px_4fr_3fr_2fr_minmax(80px,1fr)] gap-4 items-center px-4 py-2 rounded transition-colors hover:bg-white/10 ${
+                  isTrackActive ? 'bg-white/10' : ''
                 }`}
               >
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <span className="text-xs font-bold text-on-surface-variant w-4 text-center">
+                {/* Index becomes a play control on hover, as in Spotify */}
+                <div className="relative w-4 text-right">
+                  <span className={`text-base tabular-nums group-hover:opacity-0 transition-opacity ${
+                    isTrackActive ? 'text-primary' : 'text-on-surface-variant'
+                  }`}>
                     {idx + 1}
                   </span>
+                  <button
+                    onClick={() => playOrToggle(track, tracks)}
+                    className="absolute inset-0 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity text-white"
+                    title={isTrackActive && isPlaying ? 'Pause' : 'Play'}
+                    aria-label={`${isTrackActive && isPlaying ? 'Pause' : 'Play'} ${track.title}`}
+                  >
+                    {isTrackActive && isPlaying
+                      ? <Pause size={14} fill="currentColor" />
+                      : <Play size={14} fill="currentColor" />}
+                  </button>
+                </div>
 
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
-                    <CoverArt src={track.coverUrl} title={track.title} artist={track.artist} id={track.id} className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => playTrack(track, tracks)}
-                      className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {isTrackActive && isPlaying ? (
-                        <Pause size={16} fill="#ffffff" />
-                      ) : (
-                        <Play size={16} fill="#ffffff" className="ml-0.5" />
-                      )}
-                    </button>
-                  </div>
-
+                <div className="flex items-center gap-3 min-w-0">
+                  <CoverArt
+                    src={track.coverUrl}
+                    title={track.title}
+                    artist={track.artist}
+                    id={track.id}
+                    className="w-10 h-10 rounded object-cover flex-shrink-0"
+                  />
                   <div className="min-w-0">
-                    <h4 className={`text-sm font-semibold truncate ${isTrackActive ? 'text-primary' : 'text-white'}`}>
+                    <h4 className={`text-base truncate ${isTrackActive ? 'text-primary' : 'text-white'}`}>
                       {track.title}
                     </h4>
-                    <p 
+                    <button
+                      type="button"
                       onClick={() => track.artistId && onSelectArtist && onSelectArtist(track.artistId)}
-                      className="text-xs text-on-surface-variant hover:text-white cursor-pointer transition-colors truncate"
+                      className="block max-w-full text-sm text-on-surface-variant hover:text-white hover:underline transition-colors truncate text-left"
                     >
                       {track.artist}
-                    </p>
+                    </button>
                   </div>
                 </div>
 
-                <div className="hidden sm:flex items-center gap-6 text-xs text-on-surface-variant">
-                  <span className="glass-pill px-2.5 py-1 rounded-full text-[11px] text-white/80">{track.genre}</span>
-                  <span className="flex items-center gap-1"><Clock size={12} /> {formatDuration(track.duration)}</span>
-                </div>
+                <span className="hidden sm:block text-sm text-on-surface-variant truncate">
+                  {track.album || track.genre}
+                </span>
 
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="hidden xl:block text-sm text-on-surface-variant truncate tabular-nums">
+                  {formatAdded(track.createdAt)}
+                </span>
+
+                <div className="flex items-center justify-end gap-1.5">
                   {/* Add to other playlist */}
                   {onOpenAddToPlaylist && (
                     <button
                       onClick={() => onOpenAddToPlaylist(track)}
-                      className="p-2 rounded-full text-on-surface-variant hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-2 rounded-full text-on-surface-variant hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Add to another playlist"
+                      aria-label="Add to another playlist"
                     >
                       <FolderPlus size={16} />
                     </button>
@@ -345,30 +398,32 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       toggleLikeTrack(track.id);
                       logInteraction(isLiked ? 'unlike' : 'like', track.id);
                     }}
-                    className={`p-2 rounded-full transition-all ${
-                      isLiked ? 'text-primary' : 'text-on-surface-variant hover:text-white'
+                    className={`p-2 rounded-full transition-opacity ${
+                      isLiked ? 'text-primary opacity-100' : 'text-on-surface-variant hover:text-white opacity-0 group-hover:opacity-100'
                     }`}
+                    title={isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+                    aria-label={isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+                    aria-pressed={isLiked}
                   >
-                    <Heart size={16} fill={isLiked ? '#7dd3fc' : 'none'} />
+                    <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
                   </button>
+
+                  <span className="text-sm text-on-surface-variant tabular-nums w-10 text-right">
+                    {formatDuration(track.duration)}
+                  </span>
 
                   {/* Remove from this playlist */}
                   {isOwnerOrCollaborator && (
                     <button
                       onClick={(e) => handleRemoveTrack(e, track.id)}
-                      className="p-2 rounded-full text-on-surface-variant hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-2 rounded-full text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Remove from playlist"
+                      aria-label={`Remove ${track.title} from this playlist`}
                     >
                       <Trash2 size={16} />
                     </button>
                   )}
 
-                  <button
-                    onClick={() => playTrack(track, tracks)}
-                    className="p-2 rounded-xl glass-pill text-primary hover:bg-primary/20 transition-all"
-                  >
-                    {isTrackActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
-                  </button>
                 </div>
               </div>
             );

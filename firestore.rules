@@ -105,6 +105,23 @@ service cloud.firestore {
       }
     }
 
+    // -------------------------------------------------------- publicProfiles
+    // The only thing one user may learn about another: display name and
+    // avatar. This exists so the collaborator picker never needs to read
+    // /users, and the write rule pins the shape so a client cannot smuggle an
+    // email or a taste vector into a world-readable document.
+    match /publicProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+                   && uid() == userId
+                   && request.resource.data.keys().hasOnly(['name', 'avatar'])
+                   && request.resource.data.name is string
+                   && request.resource.data.name.size() > 0
+                   && request.resource.data.name.size() <= 120
+                   && request.resource.data.avatar is string
+                   && request.resource.data.avatar.size() <= 2048;
+    }
+
     // ------------------------------------------------------------- telemetry
     // Append-only, and each user can only see their own events.
     match /telemetry/{eventId} {

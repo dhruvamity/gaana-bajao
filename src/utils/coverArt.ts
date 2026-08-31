@@ -104,6 +104,23 @@ export function generateCoverArt(seed: CoverArtSeed, size = 600): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * A dominant-ish colour for the same seed the cover art uses, so a page header
+ * tinted with this reads as belonging to the artwork below it — the way a
+ * Spotify playlist header picks up its cover's colour.
+ *
+ * Derived from the seed rather than sampled from the image: it needs no canvas
+ * read (which would taint on cross-origin artwork) and no network round trip.
+ */
+export function getCoverTint(seed: CoverArtSeed, opts: { lightness?: number } = {}): string {
+  const identity = `${seed.artist ?? ''}::${seed.title ?? ''}::${seed.id ?? ''}`;
+  const hash = hashString(identity || 'gaana-bajao');
+  const hue = hash % 360;
+  const sat = 40 + ((hash >>> 4) % 20);          // 40-59%, muted enough for a backdrop
+  const light = opts.lightness ?? 26 + ((hash >>> 17) % 8); // 26-33%
+  return `hsl(${hue} ${sat}% ${light}%)`;
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')

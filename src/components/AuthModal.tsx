@@ -61,16 +61,16 @@ export const AuthModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-2xl overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 overflow-y-auto">
       {/* Dynamic Background Glow Elements */}
       <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
       <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-tertiary/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative w-full max-w-md p-8 sm:p-10 rounded-3xl bg-surface-container/90 border border-white/10 shadow-2xl space-y-7 backdrop-blur-xl text-center">
+      <div className="relative w-full max-w-md p-8 sm:p-10 rounded-lg bg-surface-container/90 border border-white/10 shadow-card space-y-7 backdrop-blur-none text-center">
         
         {/* Brand & Animated Icon */}
         <div className="space-y-3 flex flex-col items-center">
-          <div className="relative w-18 h-18 rounded-2xl bg-gradient-to-tr from-primary to-primary-container flex items-center justify-center shadow-lg shadow-primary/30 group">
+          <div className="relative w-18 h-18 rounded-lg bg-gradient-to-tr from-primary to-primary-container flex items-center justify-center shadow-lg group">
             <Music size={34} className="text-on-primary group-hover:scale-110 transition-transform" />
             <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
@@ -90,27 +90,27 @@ export const AuthModal: React.FC = () => {
 
         {/* Feature Highlights Pills */}
         <div className="grid grid-cols-2 gap-2 text-left text-xs text-on-surface-variant font-medium">
-          <div className="p-2.5 rounded-2xl bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
             <Zap size={15} className="text-primary flex-shrink-0" />
             <span>AI Acoustic Match</span>
           </div>
-          <div className="p-2.5 rounded-2xl bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
             <Radio size={15} className="text-tertiary flex-shrink-0" />
             <span>Multi-Device Sync</span>
           </div>
-          <div className="p-2.5 rounded-2xl bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
             <Flame size={15} className="text-amber-400 flex-shrink-0" />
             <span>Dynamic Mixes</span>
           </div>
-          <div className="p-2.5 rounded-2xl bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-surface-container-high/60 border border-white/5 flex items-center gap-2">
             <ShieldCheck size={15} className="text-emerald-400 flex-shrink-0" />
-            <span>30-Day Cookie Lock</span>
+            <span>Stay Signed In</span>
           </div>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div className="p-3.5 rounded-2xl bg-error/15 border border-error/30 text-error text-xs flex flex-col gap-1.5 text-left animate-in fade-in">
+          <div className="p-3.5 rounded-lg bg-error/15 border border-error/30 text-error text-xs flex flex-col gap-1.5 text-left animate-in fade-in">
             <div className="flex items-center gap-2 font-bold">
               <AlertCircle size={16} className="flex-shrink-0" />
               <span>Authentication Notice</span>
@@ -125,7 +125,7 @@ export const AuthModal: React.FC = () => {
           <button
             onClick={handleGoogleLogin}
             disabled={isLoggingIn || isDemoLoggingIn}
-            className="w-full py-3.5 px-6 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            className="w-full py-3.5 px-6 rounded-lg bg-white hover:bg-white/90 text-black font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xl hover:shadow-card transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
           >
             {isLoggingIn ? (
               <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
@@ -159,7 +159,7 @@ export const AuthModal: React.FC = () => {
           <button
             onClick={handleDemoLogin}
             disabled={isLoggingIn || isDemoLoggingIn}
-            className="w-full py-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all hover:scale-[1.01] cursor-pointer"
+            className="w-full py-3 px-4 rounded-lg bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all hover:scale-[1.01] cursor-pointer"
           >
             {isDemoLoggingIn ? (
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -171,8 +171,14 @@ export const AuthModal: React.FC = () => {
             )}
           </button>
 
-          <p className="text-[11px] text-on-surface-variant font-medium pt-1">
-            🔒 Logged-in sessions are stored in a secure 30-day browser cookie.
+          {/* The previous copy here read "stored in a secure 30-day browser
+              cookie". The cookie is not Secure, not HttpOnly and not signed, so
+              that sentence described a protection the app does not provide.
+              It now says what actually happens. */}
+          <p className="text-[11px] text-on-surface-variant font-medium pt-1 leading-relaxed">
+            Signing in with Google keeps you signed in for 30 days; your account is
+            verified with Google every time the app loads. Guest sessions stay on
+            this device only and are not backed up.
           </p>
         </div>
 

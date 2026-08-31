@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { UserProfile, TimeOfDay, ActivityContext, DeviceType } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { ConnectSyncService } from '../services/connectSync';
-import { getAuthCookie, setAuthCookie, clearAuthCookie, StoredSession } from '../utils/cookieUtils';
+import { getAuthCookie, setAuthCookie, clearAuthCookie, isGuestId, StoredSession } from '../utils/cookieUtils';
 
 interface AuthContextType {
   currentUser: UserProfile | null;
@@ -44,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         id: cookie.uid,
         name: cookie.displayName || 'Music Fan',
-        email: cookie.email || undefined,
         avatar: cookie.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${cookie.uid}`,
         isOnboarded: true,
         selectedGenres: [],
@@ -71,14 +70,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // (prevents onAuthStateChanged from racing with our login methods)
   const loginInProgressRef = useRef(false);
 
-  // Sync cookie helper with 30-day max-age
+  /* The auth listener is installed once and must not be torn down whenever the
+     profile changes, so it reads the current user through a ref rather than
+     closing over the state value. */
+  const currentUserRef = useRef<UserProfile | null>(currentUser);
+  currentUserRef.current = currentUser;
+
+  // Sync cookie helper with 30-day max-age.
+  // The email is deliberately not stored: the cookie is readable by any script
+  // on the origin and nothing in the UI needs the address to repaint a shell.
   const syncSessionCookie = useCallback((user: UserProfile) => {
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
     const session: StoredSession = {
       uid: user.id,
-      email: user.email || null,
       displayName: user.name,
       photoURL: user.avatar,
+      kind: isGuestId(user.id) ? 'guest' : 'firebase',
       expiresAt
     };
     setAuthCookie(session, 30);
@@ -99,8 +106,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // 2. Enhance cookie-restored profile with full database data  
+        // 2. Enhance cookie-restored profile with full database data
         const storedCookie = getAuthCookie();
+
+        /* A session claiming a Firebase identity is only as good as Firebase's
+           confirmation of it. If Auth is not configured, that confirmation can
+           never arrive — onAuthChanged would never fire — so the session is
+           refused here instead of being trusted by default. */
+        if (storedCookie && storedCookie.kind === 'firebase' && !DatabaseService.isAuthAvailable()) {
+          clearAuthCookie();
+          if (isMounted) {
+            setCurrentUser(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         if (storedCookie) {
           const daysLeft = Math.ceil((storedCookie.expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
           if (isMounted) setSessionDaysRemaining(Math.max(1, daysLeft));
@@ -133,7 +154,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      if (fbUser && isMounted) {
+      if (!fbUser) {
+        /* THIS is what makes the restore cookie safe.
+           Firebase reporting "nobody is signed in" is authoritative for any
+           session that claims a Firebase identity. Previously this branch did
+           not exist, so a cookie naming any uid was never contradicted and the
+           app would render — and attempt writes — as that user indefinitely.
+           Guest sessions are exempt because they never had a Firebase identity
+           to lose; they are local profiles that grant no server-side access. */
+        if (isMounted && currentUserRef.current && !isGuestId(currentUserRef.current.id)) {
+          clearAuthCookie();
+          setCurrentUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (isMounted) {
         // Only update if we don't already have this user set (prevents unnecessary re-renders)
         try {
           const existing = await DatabaseService.getUserById(fbUser.uid);

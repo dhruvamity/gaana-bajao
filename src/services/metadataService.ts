@@ -31,6 +31,122 @@ export function extractAudioMetadata(file: File): Promise<ExtractedMetadata> {
 /** How much of a file to pull when its ID3 header does not declare a tag size. */
 const PROBE_BYTES = 512 * 1024;
 
+/** What a remote tag read actually found, including why it found nothing. */
+export interface RemoteTagProbe {
+  /** The tag region was fetched and parsed without a transport error. */
+  ok: boolean;
+  httpStatus: number | null;
+  bytesRead: number;
+  /**
+   * Container detected from the leading bytes. `mpeg-no-tag` means valid audio
+   * whose ID3v2 tag is simply absent — which is what a host that strips
+   * metadata on delivery produces.
+   */
+  container: 'id3v2' | 'mp4' | 'flac' | 'ogg' | 'mpeg-no-tag' | 'unknown' | null;
+  metadata: ExtractedMetadata;
+  error: string | null;
+}
+
+function detectContainer(head: Uint8Array): RemoteTagProbe['container'] {
+  if (head.length < 12) return 'unknown';
+  const ascii = (o: number, n: number) =>
+    String.fromCharCode(...Array.from(head.slice(o, o + n)));
+  if (ascii(0, 3) === 'ID3') return 'id3v2';
+  if (ascii(4, 4) === 'ftyp') return 'mp4';
+  if (ascii(0, 4) === 'fLaC') return 'flac';
+  if (ascii(0, 4) === 'OggS') return 'ogg';
+  // MPEG audio frame sync: 11 set bits.
+  if (head[0] === 0xff && (head[1] & 0xe0) === 0xe0) return 'mpeg-no-tag';
+  return 'unknown';
+}
+
+/**
+ * Read remote tags and report exactly what happened.
+ *
+ * A transport failure and a genuinely untagged file are very different
+ * problems, and reporting both as "no metadata" makes the difference
+ * undiagnosable. This keeps them apart.
+ */
+export async function probeAudioTagsFromUrl(url: string): Promise<RemoteTagProbe> {
+  const probe: RemoteTagProbe = {
+    ok: false,
+    httpStatus: null,
+    bytesRead: 0,
+    container: null,
+    metadata: emptyMetadata(),
+    error: null
+  };
+
+  if (!url) {
+    probe.error = 'Track has no audio URL';
+    return probe;
+  }
+
+  let head: Response;
+  try {
+    head = await fetchRange(url, 0, 15);
+  } catch (err: any) {
+    // A cross-origin failure surfaces here as an opaque TypeError.
+    probe.error =
+      `Could not read the audio file (${err?.message || 'network error'}). ` +
+      `This is usually a CORS restriction on the media host.`;
+    return probe;
+  }
+
+  probe.httpStatus = head.status;
+  if (!head.ok) {
+    probe.error = `Media host returned HTTP ${head.status}`;
+    return probe;
+  }
+
+  try {
+    let region: Blob;
+    if (head.status === 200) {
+      // Host ignored Range and sent the whole body; nothing to gain from a second request.
+      region = await head.blob();
+      probe.container = detectContainer(new Uint8Array(await region.slice(0, 16).arrayBuffer()));
+    } else {
+      const header = new Uint8Array(await head.arrayBuffer());
+      probe.container = detectContainer(header);
+
+      if (probe.container === 'id3v2') {
+        const tagSize =
+          (header[6] << 21) | (header[7] << 14) | (header[8] << 7) | header[9];
+        const end = 10 + tagSize + 1024;
+        const tagResponse = await fetchRange(url, 0, end);
+        if (!tagResponse.ok) {
+          probe.error = `Media host returned HTTP ${tagResponse.status} for the tag range`;
+          return probe;
+        }
+        region = await tagResponse.blob();
+      } else {
+        const wide = await fetchRange(url, 0, PROBE_BYTES - 1);
+        if (!wide.ok) {
+          probe.error = `Media host returned HTTP ${wide.status}`;
+          return probe;
+        }
+        region = await wide.blob();
+      }
+    }
+
+    probe.bytesRead = region.size;
+    probe.metadata = await readTags(
+      new File([region], 'remote-audio', { type: 'audio/mpeg' })
+    );
+    probe.ok = true;
+
+    if (probe.container === 'mpeg-no-tag' && !probe.metadata.title) {
+      probe.error =
+        'Valid audio, but no ID3 tag at the start of the file. The stored copy ' +
+        'has no embedded metadata — media hosts commonly strip it on upload or delivery.';
+    }
+    return probe;
+  } catch (err: any) {
+    probe.error = err?.message || 'Failed to parse the tag region';
+    return probe;
+  }
+}
+
 /**
  * Extract metadata from an already-uploaded audio URL.
  *
@@ -46,9 +162,7 @@ const PROBE_BYTES = 512 * 1024;
  * artwork, instead of the whole multi-megabyte file.
  */
 export async function extractAudioMetadataFromUrl(url: string): Promise<ExtractedMetadata> {
-  const blob = await fetchTagRegion(url);
-  if (!blob) return emptyMetadata();
-  return readTags(new File([blob], 'remote-audio', { type: 'audio/mpeg' }));
+  return (await probeAudioTagsFromUrl(url)).metadata;
 }
 
 async function fetchRange(url: string, start: number, endInclusive: number): Promise<Response> {
@@ -58,45 +172,6 @@ async function fetchRange(url: string, start: number, endInclusive: number): Pro
     mode: 'cors',
     credentials: 'omit'
   });
-}
-
-/**
- * Fetch just the region of the file that can contain tags.
- * Returns null when the resource cannot be read at all.
- */
-async function fetchTagRegion(url: string): Promise<Blob | null> {
-  try {
-    // Read the 10-byte ID3v2 header, which declares the tag length.
-    const head = await fetchRange(url, 0, 9);
-    if (!head.ok) return null;
-
-    // A host that ignores Range answers 200 with the entire body; in that case
-    // there is nothing to gain from a second request.
-    if (head.status === 200) {
-      return await head.blob();
-    }
-
-    const header = new Uint8Array(await head.arrayBuffer());
-    if (header.length >= 10 && header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33) {
-      // Synchsafe integer: 7 significant bits per byte.
-      const tagSize =
-        (header[6] << 21) | (header[7] << 14) | (header[8] << 7) | header[9];
-      // Header + declared tag, plus a small margin for an extended header.
-      const end = 10 + tagSize + 1024;
-      const tagResponse = await fetchRange(url, 0, end);
-      if (!tagResponse.ok) return null;
-      return await tagResponse.blob();
-    }
-
-    // Not ID3v2 (could be an MP4/M4A `moov` atom or a FLAC block). Pull a
-    // bounded probe and let the parser look for what it recognises.
-    const probe = await fetchRange(url, 0, PROBE_BYTES - 1);
-    if (!probe.ok) return null;
-    return await probe.blob();
-  } catch (err) {
-    console.warn('Could not read tag region for', url, err);
-    return null;
-  }
 }
 
 function emptyMetadata(): ExtractedMetadata {

@@ -98,12 +98,12 @@ export const TasteOnboarding: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl glass-elevated border border-white/20 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-8 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-surface-container-high rounded-lg p-6 sm:p-10 shadow-card space-y-8 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 text-xs font-bold uppercase tracking-wider mb-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 text-primary border border-white/10 text-xs font-bold uppercase tracking-wider mb-1">
             <Sparkles size={13} />
             Taste Profile Vector
           </div>
@@ -131,9 +131,9 @@ export const TasteOnboarding: React.FC = () => {
                   key={genre}
                   type="button"
                   onClick={() => toggleGenre(genre)}
-                  className={`px-4 py-2 rounded-2xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-4 py-2 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                     isSelected
-                      ? 'bg-primary text-black border-primary shadow-lg shadow-primary/20 scale-105'
+                      ? 'bg-primary text-black border-primary shadow-lg  scale-105'
                       : 'bg-surface-container/80 border-white/10 text-on-surface-variant hover:text-white hover:border-white/20'
                   }`}
                 >
@@ -159,7 +159,7 @@ export const TasteOnboarding: React.FC = () => {
                   key={vibe}
                   type="button"
                   onClick={() => toggleVibe(vibe)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
+                  className={`px-3.5 py-2 rounded text-xs font-semibold transition-all border cursor-pointer ${
                     isSelected
                       ? 'bg-white text-black border-white shadow-md'
                       : 'bg-surface-container-high/60 border-white/5 text-on-surface-variant hover:text-white'
@@ -173,7 +173,7 @@ export const TasteOnboarding: React.FC = () => {
         </div>
 
         {/* 3. Add Custom Tag Form */}
-        <form onSubmit={handleAddCustomTag} className="p-4 rounded-2xl bg-surface-container-high/40 border border-white/5 space-y-3">
+        <form onSubmit={handleAddCustomTag} className="p-4 rounded-lg bg-surface-container-high/40 border border-white/5 space-y-3">
           <div className="text-xs font-bold text-white flex items-center gap-1.5">
             <Plus size={14} className="text-primary" />
             <span>Add Custom Genre or Mood Tag</span>
@@ -183,7 +183,7 @@ export const TasteOnboarding: React.FC = () => {
             <select
               value={customTagType}
               onChange={(e) => setCustomTagType(e.target.value as any)}
-              className="px-3 py-2 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+              className="px-3 py-2 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
             >
               <option value="genre">Genre</option>
               <option value="vibe">Mood / Vibe</option>
@@ -194,13 +194,13 @@ export const TasteOnboarding: React.FC = () => {
               value={customTagInput}
               onChange={(e) => setCustomTagInput(e.target.value)}
               placeholder="e.g. Progressive Metal, Coding Chill..."
-              className="flex-1 px-3.5 py-2 rounded-xl bg-surface-container border border-white/10 text-white text-xs focus:outline-none focus:border-primary"
+              className="flex-1 px-3.5 py-2 rounded bg-surface-container-high text-white text-xs focus:outline-none focus:border-primary"
             />
 
             <button
               type="submit"
               disabled={!customTagInput.trim()}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold disabled:opacity-40 transition-colors"
+              className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-bold disabled:opacity-40 transition-colors"
             >
               Add
             </button>
@@ -219,7 +219,7 @@ export const TasteOnboarding: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={selectedGenres.length === 0}
-            className="px-8 py-3 rounded-full bg-primary hover:bg-primary/90 text-black font-extrabold text-xs shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-8 py-3 rounded-full bg-primary hover:bg-primary/90 text-black font-extrabold text-xs shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
           >
             <span>Save Taste Profile</span>
             <Check size={16} />
