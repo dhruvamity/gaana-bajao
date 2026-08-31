@@ -136,6 +136,15 @@ export interface TelemetryEvent {
 
 export interface DeviceSession {
   id: string;
+  /**
+   * Owner of this device session.
+   *
+   * Required, not optional: `device_sessions` is a single top-level collection
+   * keyed only by a random device id, so without this field there is nothing
+   * for a security rule to gate on and every user's current track, position
+   * and device list is readable by every other user.
+   */
+  userId: string;
   name: string;
   deviceType: DeviceType;
   isCurrentDevice: boolean;

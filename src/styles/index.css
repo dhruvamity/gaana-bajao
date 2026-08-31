@@ -47,10 +47,20 @@
    The previous `.glass-*` classes are gone; nothing referenced them.
    ========================================================================== */
 
-/* A full-height, square-cornered column of the shell. */
+/* A full-height, square-cornered column of the shell.
+
+   NOTE: do not set the `overflow` shorthand here. This class is applied
+   alongside Tailwind's `overflow-y-auto` on the scrolling content column, and
+   because it is declared after `@tailwind utilities` at equal specificity, a
+   shorthand here wins on source order and silently clobbers BOTH axes — which
+   left every view inside <main> unscrollable while programmatic scrollTop
+   still worked, so nothing in the code looked broken.
+
+   Only the horizontal axis is clipped, and only as a longhand, so the
+   vertical axis stays under the utility class's control. */
 .app-panel {
   background: #121212;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* The standard content tile: translucent so it picks up the hero behind it.
@@ -226,7 +236,12 @@ input[type="range"]:hover::-moz-range-thumb {
   background: #ffffff;
 }
 
-.scrub-track:hover .scrub-fill {
+/* Focus is treated exactly like hover. Without the focus-visible half, a
+   keyboard user seeking with the arrow keys got the green focus ring around
+   the track but no handle showing where the playhead was going — while the
+   native volume input right next to it does reveal its thumb on focus. */
+.scrub-track:hover .scrub-fill,
+.scrub-track:focus-visible .scrub-fill {
   background: #1ed760;
 }
 
@@ -235,7 +250,8 @@ input[type="range"]:hover::-moz-range-thumb {
   transition: opacity 0.1s ease;
 }
 
-.scrub-track:hover .scrub-thumb {
+.scrub-track:hover .scrub-thumb,
+.scrub-track:focus-visible .scrub-thumb {
   opacity: 1;
 }
 

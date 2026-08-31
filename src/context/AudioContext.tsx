@@ -60,6 +60,16 @@ interface AudioContextType {
 /** How often a playing device republishes its position for Connect & Handoff. */
 const PLAYBACK_HEARTBEAT_MS = 15000;
 
+/**
+ * How long the volume must be still before its new value is published.
+ *
+ * Volume is a continuous control: one slider drag emits an input event per
+ * pointer sample. Broadcasting each one turned a single ~1.8s drag into 40
+ * Firestore writes plus 40 synchronous localStorage round trips, all carrying
+ * an identical playback position.
+ */
+const VOLUME_SYNC_DEBOUNCE_MS = 600;
+
 /** Shared zero-filled buffer returned when no analyser is available. */
 const EMPTY_FREQUENCY_DATA = new Uint8Array(32);
 
@@ -166,16 +176,29 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const progressRef = useRef(0);
   progressRef.current = progress;
 
+  /* `volume` is read through a ref for exactly the reason `progress` is.
+     While it was a dependency of broadcastNow, every volume change rebuilt the
+     callback — which both fired an immediate broadcast AND tore down and
+     restarted the 15s heartbeat interval, so continuous adjustment meant the
+     heartbeat never matured once. */
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+
+  const userIdRef = useRef<string | undefined>(currentUser?.id);
+  userIdRef.current = currentUser?.id;
+
   const broadcastNow = useCallback(() => {
     ConnectSyncService.broadcastState({
+      userId: userIdRef.current,
       isPlaying,
       currentTrackId: currentTrack?.id,
       progressSeconds: progressRef.current,
-      volume,
+      volume: volumeRef.current,
       isActivePlayback: isPlaying
     });
-  }, [isPlaying, currentTrack?.id, volume]);
+  }, [isPlaying, currentTrack?.id]);
 
+  // Real state transitions: play/pause and track change.
   useEffect(() => {
     broadcastNow();
   }, [broadcastNow]);
@@ -185,6 +208,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const id = window.setInterval(broadcastNow, PLAYBACK_HEARTBEAT_MS);
     return () => window.clearInterval(id);
   }, [isPlaying, broadcastNow]);
+
+  /* Volume settles into a single write. The first run is skipped so mounting
+     does not publish a redundant broadcast alongside the transition effect
+     above. */
+  const volumeSettledRef = useRef(false);
+  useEffect(() => {
+    if (!volumeSettledRef.current) {
+      volumeSettledRef.current = true;
+      return;
+    }
+    const id = window.setTimeout(broadcastNow, VOLUME_SYNC_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [volume, broadcastNow]);
 
   const logInteractionInternal = useCallback(async (
     action: InteractionType,
@@ -215,14 +251,29 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     logInteractionInternal(type, trackId);
   };
 
-  const playTrack = (track: Track, newQueue?: Track[]) => {
+  /**
+   * Start a track.
+   *
+   * `userInitiated` decides whether leaving the current track counts as a
+   * skip. It is the single source of that judgement in the whole provider:
+   * nextTrack() used to log a skip itself and then call through to here, which
+   * logged the very same abandonment again — two identical events a
+   * millisecond apart, and a doubled negative reward for the ranking engine
+   * that reads them. It is also false when a track ends on its own, so a track
+   * shorter than 30s no longer records both a completion and a skip.
+   */
+  const startTrack = (
+    track: Track,
+    newQueue?: Track[],
+    { userInitiated = true }: { userInitiated?: boolean } = {}
+  ) => {
     if (!audioEngineRef.current) return;
 
     /* Classify the abandoned track through the engine rather than re-deriving
        the 30s rule here. RecommendationEngine was imported but never called
        anywhere in the app; this makes the threshold single-sourced, so tuning
        Thesis 1 actually changes what the app records. */
-    if (currentTrack && currentTrack.id !== track.id && isPlaying) {
+    if (userInitiated && currentTrack && currentTrack.id !== track.id && isPlaying) {
       const { action } = RecommendationEngine.evaluatePlaybackDuration(progress, duration, true);
       if (action === 'skip_early') {
         logInteractionInternal('skip_early', currentTrack.id, progress);
@@ -243,6 +294,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audioEngineRef.current.play().catch(e => console.warn('Autoplay prevented', e));
     setIsPlaying(true);
   };
+
+  const playTrack = (track: Track, newQueue?: Track[]) => startTrack(track, newQueue);
 
   const playOrToggle = (track: Track, newQueue?: Track[]) => {
     if (currentTrack?.id === track.id) {
@@ -267,20 +320,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const handleTrackEnded = () => {
     if (isRepeat && currentTrack) {
       seek(0);
+      // A repeat pass is a fresh listen, so the 30s reward can be earned again.
+      hasLogged30sRef.current = false;
       resume();
       return;
     }
-    nextTrack();
+    advance({ userInitiated: false });
   };
 
-  const nextTrack = () => {
+  /**
+   * Move to the next entry in the queue.
+   *
+   * Skip classification is left entirely to startTrack — see the note there.
+   */
+  const advance = ({ userInitiated }: { userInitiated: boolean }) => {
     if (queue.length === 0) return;
     const currentIndex = queue.findIndex(t => t.id === currentTrack?.id);
-
-    // If user skipped before 30s
-    if (currentTrack && progress < 30 && isPlaying) {
-      logInteractionInternal('skip_early', currentTrack.id, progress);
-    }
 
     let nextIndex = currentIndex + 1;
     if (isShuffle) {
@@ -288,13 +343,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (nextIndex < queue.length) {
-      playTrack(queue[nextIndex]);
+      startTrack(queue[nextIndex], undefined, { userInitiated });
     } else if (isRepeat) {
-      playTrack(queue[0]);
+      startTrack(queue[0], undefined, { userInitiated });
     } else {
       setIsPlaying(false);
     }
   };
+
+  const nextTrack = () => advance({ userInitiated: true });
 
   const prevTrack = () => {
     if (progress > 3) {

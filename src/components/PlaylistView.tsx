@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, 
   Pause, 
@@ -13,14 +13,19 @@ import {
   Trash2,
   FolderPlus,
   Search,
-  Check
+  Check,
+  ImagePlus,
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 import { Playlist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
+import { StorageService } from '../services/storageService';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
-import { getCoverTint } from '../utils/coverArt';
+import { PlaylistCover } from './PlaylistCover';
+import { getCoverTint, isPlaceholderCover } from '../utils/coverArt';
 
 interface PlaylistViewProps {
   playlist: Playlist;
@@ -44,6 +49,12 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
   const [isAddTracksOpen, setIsAddTracksOpen] = useState<boolean>(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState<string>('');
+
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [coverBusy, setCoverBusy] = useState<boolean>(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+
+  const hasCustomCover = !isPlaceholderCover(currentPlaylist.coverUrl);
 
   const isOwnerOrCollaborator = !currentPlaylist.isAlgorithmic && Boolean(
     (currentUser && currentPlaylist.ownerId === currentUser.id) ||
@@ -122,6 +133,55 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
      t.artist.toLowerCase().includes(trackSearchQuery.toLowerCase()))
   );
 
+  /* Custom artwork. Clearing it does not delete the uploaded image — unsigned
+     Cloudinary uploads cannot be removed from the client — it just stops the
+     playlist pointing at it, so the collage takes over again. */
+  const MAX_COVER_BYTES = 5 * 1024 * 1024;
+
+  const persistCover = async (coverUrl: string) => {
+    const updated: Playlist = { ...currentPlaylist, coverUrl, updatedAt: Date.now() };
+    await DatabaseService.savePlaylist(updated);
+    setCurrentPlaylist(updated);
+  };
+
+  const handleCoverSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';                 // so re-picking the same file still fires
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setCoverError('That file is not an image.');
+      return;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverError('Cover images must be under 5 MB.');
+      return;
+    }
+
+    setCoverBusy(true);
+    setCoverError(null);
+    try {
+      const url = await StorageService.saveImageBlob(`playlist_cover_${currentPlaylist.id}`, file);
+      await persistCover(url);
+    } catch (err: any) {
+      setCoverError(err?.message || 'Could not upload that image.');
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
+  const handleResetCover = async () => {
+    setCoverBusy(true);
+    setCoverError(null);
+    try {
+      await persistCover('');
+    } catch (err: any) {
+      setCoverError(err?.message || 'Could not reset the cover.');
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
   return (
     <div className="relative -mt-header pb-8">
       {/* Hero: a full-bleed wash tinted from the artwork, running up behind the
@@ -132,18 +192,75 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
         style={{ background: `linear-gradient(180deg, ${heroTint} 0%, rgba(18,18,18,.6) 70%, #121212 100%)` }}
       >
         <div className="flex flex-col md:flex-row items-center md:items-end gap-6 pt-8">
-        <div className="relative w-48 h-48 md:w-[232px] md:h-[232px] rounded overflow-hidden shadow-card flex-shrink-0">
-          <CoverArt
-            src={currentPlaylist.coverUrl}
-            title={currentPlaylist.title}
-            artist={currentPlaylist.ownerName}
-            id={currentPlaylist.id}
+        <div className="group relative w-48 h-48 md:w-[232px] md:h-[232px] rounded overflow-hidden shadow-card flex-shrink-0">
+          <PlaylistCover
+            playlist={currentPlaylist}
+            tracks={allCatalogTracks}
             loading="eager"
             className="w-full h-full object-cover"
           />
+
+          {/* Cover editing. Revealed on hover, and on keyboard focus so it is
+              reachable without a pointer. */}
+          {isOwnerOrCollaborator && (
+            <>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverSelected}
+              />
+
+              <div
+                className={`absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 transition-opacity ${
+                  coverBusy ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+                }`}
+              >
+                {coverBusy ? (
+                  <>
+                    <Loader2 size={26} className="text-white animate-spin" />
+                    <span className="text-2xs font-bold uppercase tracking-label text-white">
+                      Uploading
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      className="flex flex-col items-center gap-1.5 text-white"
+                    >
+                      <ImagePlus size={26} />
+                      <span className="text-2xs font-bold uppercase tracking-label">
+                        {hasCustomCover ? 'Replace cover' : 'Choose cover'}
+                      </span>
+                    </button>
+
+                    {hasCustomCover && (
+                      <button
+                        type="button"
+                        onClick={handleResetCover}
+                        className="mt-1 flex items-center gap-1.5 text-2xs font-bold uppercase tracking-label text-on-surface-variant hover:text-white transition-colors"
+                        title="Go back to the collage of this playlist's first four tracks"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Use track collage</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="min-w-0 flex-1 text-center md:text-left">
+          {coverError && (
+            <p role="alert" className="mb-2 text-sm font-semibold text-red-300">
+              {coverError}
+            </p>
+          )}
           <span className="text-2xs font-bold uppercase tracking-label text-white">
             {currentPlaylist.isAlgorithmic ? 'Curated playlist' : 'Public playlist'}
           </span>

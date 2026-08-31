@@ -31,3 +31,6 @@ dist-ssr
 *.sln
 *.sw?
 .env.test
+
+# Private security notes — must never be committed to a public repo.
+SECURITY-PRIVATE.md
