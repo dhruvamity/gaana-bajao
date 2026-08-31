@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Play, Heart, FolderPlus, UploadCloud } from 'lucide-react';
 import { Track, Playlist, Artist, Shelf, TelemetryEvent } from '../types';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { RecommendationEngine } from '../services/recommendationEngine';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -66,7 +66,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
     };
 
     loadData();
-    return () => { isMounted = false; };
+    const unsubscribe = onTracksChanged(() => {
+      if (isMounted) loadData();
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [currentUser?.id]);
 
   const getGreeting = () => {

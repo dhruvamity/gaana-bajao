@@ -27,6 +27,7 @@ import {
 } from 'firebase/auth';
 import { Track, Playlist, UserProfile, PublicProfile, TelemetryEvent, DeviceSession, Artist } from '../types';
 import { slugifyArtistId } from '../utils/artistId';
+import { isAudioUrlMissing } from './metadataService';
 
 // Default / fallback local storage keys
 const STORAGE_KEYS = {
@@ -159,6 +160,27 @@ async function withWriteRetry<T>(operation: string, fn: () => Promise<T>, maxRet
 let _tracksCache: Track[] | null = null;
 let _tracksCachePromise: Promise<Track[]> | null = null;
 
+export type TrackChangeListener = () => void;
+const _trackChangeListeners = new Set<TrackChangeListener>();
+
+/**
+ * Register a listener for real-time track catalog changes (additions, deletions, auto-prunes).
+ */
+export function onTracksChanged(listener: TrackChangeListener): () => void {
+  _trackChangeListeners.add(listener);
+  return () => { _trackChangeListeners.delete(listener); };
+}
+
+export function notifyTracksChanged(): void {
+  _trackChangeListeners.forEach(fn => {
+    try {
+      fn();
+    } catch (e) {
+      console.warn('Track change listener error', e);
+    }
+  });
+}
+
 /** Drop the cached result so the next getTracks() re-fetches. */
 export function invalidateTracksCache(): void {
   _tracksCache = null;
@@ -166,6 +188,7 @@ export function invalidateTracksCache(): void {
 }
 
 export class DatabaseService {
+  private static _isPruning = false;
   /**
    * Fetch all real tracks (purges legacy mock/dummy data automatically).
    *
@@ -226,6 +249,8 @@ export class DatabaseService {
     if (db) {
       await withWriteRetry('Saving track', () => setDoc(doc(db!, 'tracks', track.id), stripUndefined(track)));
     }
+
+    notifyTracksChanged();
   }
 
   /**
@@ -249,6 +274,78 @@ export class DatabaseService {
       if (pl.trackIds.includes(trackId)) {
         await this.removeTrackFromPlaylist(pl.id, trackId);
       }
+    }
+
+    // Remove from user liked / recent lists in local storage
+    try {
+      const users: UserProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+      let userUpdated = false;
+      const cleanUsers = users.map(u => {
+        const hadLiked = u.likedTrackIds?.includes(trackId);
+        const hadRecent = u.recentTrackIds?.includes(trackId);
+        if (hadLiked || hadRecent) {
+          userUpdated = true;
+          return {
+            ...u,
+            likedTrackIds: u.likedTrackIds?.filter(id => id !== trackId) || [],
+            recentTrackIds: u.recentTrackIds?.filter(id => id !== trackId) || []
+          };
+        }
+        return u;
+      });
+      if (userUpdated) {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleanUsers));
+      }
+    } catch {
+      // non-critical
+    }
+
+    notifyTracksChanged();
+  }
+
+  /**
+   * Autonomous Background Auto-Pruner:
+   * Proactively verifies all catalog tracks against Cloudinary and automatically
+   * deletes any orphaned documents whose audio URL returns HTTP 404 / 410.
+   */
+  public static async autoPruneMissingTracks(): Promise<number> {
+    if (this._isPruning) return 0;
+    this._isPruning = true;
+
+    try {
+      const tracks = await this.getTracks();
+      if (!tracks || tracks.length === 0) return 0;
+
+      const deadTracks: Track[] = [];
+      const queue = [...tracks];
+      const concurrency = Math.min(3, queue.length);
+
+      const workers = Array.from({ length: concurrency }, async () => {
+        while (queue.length > 0) {
+          const track = queue.shift();
+          if (!track) break;
+          const missing = await isAudioUrlMissing(track.audioUrl);
+          if (missing) {
+            deadTracks.push(track);
+          }
+        }
+      });
+
+      await Promise.all(workers);
+
+      if (deadTracks.length > 0) {
+        console.log(`[AutoPrune] Detected ${deadTracks.length} deleted Cloudinary track(s). Autonomously purging...`);
+        for (const dead of deadTracks) {
+          await this.deleteTrack(dead.id);
+        }
+      }
+
+      return deadTracks.length;
+    } catch (err) {
+      console.warn('Auto-prune check failed', err);
+      return 0;
+    } finally {
+      this._isPruning = false;
     }
   }
 

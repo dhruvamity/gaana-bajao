@@ -9,7 +9,7 @@ import {
   X
 } from 'lucide-react';
 import { Playlist, Artist, Track } from '../types';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
 import { PlaylistCover } from './PlaylistCover';
@@ -69,6 +69,10 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
     };
 
     loadLibrary();
+    const unsubscribe = onTracksChanged(() => {
+      loadLibrary();
+    });
+    return () => unsubscribe();
   }, [currentView]);
 
   useEffect(() => {

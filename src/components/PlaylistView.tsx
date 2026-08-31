@@ -19,7 +19,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { Playlist, Track } from '../types';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { StorageService } from '../services/storageService';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -76,6 +76,10 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
 
   useEffect(() => {
     loadData();
+    const unsubscribe = onTracksChanged(() => {
+      loadData();
+    });
+    return () => unsubscribe();
   }, [currentPlaylist]);
 
   const formatDuration = (secs: number) => {

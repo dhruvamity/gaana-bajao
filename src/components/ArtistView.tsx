@@ -13,7 +13,7 @@ import {
   Activity
 } from 'lucide-react';
 import { Artist, Track } from '../types';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { FolderPlus } from 'lucide-react';
@@ -71,6 +71,10 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
     };
 
     loadArtistData();
+    const unsubscribe = onTracksChanged(() => {
+      loadArtistData();
+    });
+    return () => unsubscribe();
   }, [artistId]);
 
   if (!artist) return null;

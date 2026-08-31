@@ -16,7 +16,7 @@ import {
   FolderPlus
 } from 'lucide-react';
 import { Track } from '../types';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, onTracksChanged } from '../services/firebase';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
@@ -96,10 +96,22 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
   }, [catalog]);
 
   useEffect(() => {
-    DatabaseService.getTracks().then(tracks => {
-      setCatalog(tracks);
-      setFilteredTracks(tracks);
+    let isMounted = true;
+    const fetchCatalog = () => {
+      DatabaseService.getTracks().then(tracks => {
+        if (!isMounted) return;
+        setCatalog(tracks);
+        setFilteredTracks(tracks);
+      });
+    };
+    fetchCatalog();
+    const unsubscribe = onTracksChanged(() => {
+      if (isMounted) fetchCatalog();
     });
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

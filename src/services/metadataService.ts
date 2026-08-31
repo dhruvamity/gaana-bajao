@@ -61,6 +61,26 @@ function detectContainer(head: Uint8Array): RemoteTagProbe['container'] {
 }
 
 /**
+ * Fast check to determine if an audio resource is definitively missing from Cloudinary (HTTP 404 or 410).
+ * Returns true if and only if the host explicitly responds with 404 or 410.
+ * Returns false on successful responses, or if network/CORS fails (preventing false-positive deletion).
+ */
+export async function isAudioUrlMissing(url: string | undefined | null): Promise<boolean> {
+  if (!url || typeof url !== 'string' || !url.trim()) return true;
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      signal: AbortSignal.timeout(5000)
+    });
+    return res.status === 404 || res.status === 410;
+  } catch (err) {
+    // Cross-origin or network failures do not mean the file is deleted.
+    return false;
+  }
+}
+
+/**
  * Read remote tags and report exactly what happened.
  *
  * A transport failure and a genuinely untagged file are very different
