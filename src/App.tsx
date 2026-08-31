@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useRef, useState, useEffect, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -19,6 +20,8 @@ import { EditPlaylistModal } from './components/EditPlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { UserManagementModal } from './components/UserManagementModal';
 import { AuthModal } from './components/AuthModal';
+import { TrackRouteHandler } from './components/TrackRouteHandler';
+import { NotFoundView } from './components/NotFoundView';
 import { Playlist, Track } from './types';
 import { Music } from 'lucide-react';
 
@@ -40,110 +43,46 @@ const ViewFallback = () => (
   </div>
 );
 
-/** A snapshot of everything that decides what the content column renders. */
-interface ViewState {
-  view: string;
-  artistId: string | null;
-  playlist: Playlist | null;
-}
-
-/** Serialisable subset of ViewState for browser history.state. */
-interface SerializedViewState {
-  view: string;
-  artistId: string | null;
-  /** Playlists are JSON-safe objects, so they round-trip through history.state. */
-  playlist: Playlist | null;
-}
-
-function serializeViewState(s: ViewState): SerializedViewState {
-  return { view: s.view, artistId: s.artistId, playlist: s.playlist };
-}
-
 const MainAppContent: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const { currentUser, isAuthenticated, isLoading, isUserModalOpen, setIsUserModalOpen } = useAuth();
   const { currentTrack } = useAudio();
 
-  // Restore the view from browser history.state on mount (hard refresh).
-  const initial = (typeof window !== 'undefined' && window.history.state) as SerializedViewState | null;
-
-  const [currentView, setCurrentView] = useState<string>(initial?.view || 'home');
   // Owned here so the navbar search box and the search view share one query.
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedArtistId, setSelectedArtistId] = useState<string | null>(initial?.artistId || null);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(initial?.playlist || null);
 
   // The content column scrolls independently, and the top bar sitting inside it
   // needs to know when to stop being transparent.
   const mainRef = useRef<HTMLElement>(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  /* The comp's header has a back arrow, which needs somewhere to go. The app
-     has no router, so navigation keeps its own stack of view snapshots. */
-  const [history, setHistory] = useState<ViewState[]>([]);
-
-  /** True while our own goBack() is driving a history.back() — suppresses the
-   *  popstate handler so the view isn't applied twice. */
-  const isInternalPop = useRef(false);
-
-  const pushHistory = () => {
-    setHistory(h => [
-      ...h.slice(-19),
-      { view: currentView, artistId: selectedArtistId, playlist: selectedPlaylist }
-    ]);
-  };
-
-  const applyView = useCallback((state: ViewState) => {
-    setCurrentView(state.view);
-    setSelectedArtistId(state.artistId);
-    setSelectedPlaylist(state.playlist);
-    mainRef.current?.scrollTo({ top: 0 });
-    setIsScrolled(false);
-  }, []);
-
-  const navigate = (view: string) => {
-    if (view === currentView) return;
-    pushHistory();
-    setCurrentView(view);
-    mainRef.current?.scrollTo({ top: 0 });
-    setIsScrolled(false);
-    // Push a browser history entry so Back/Forward work.
-    window.history.pushState(
-      serializeViewState({ view, artistId: selectedArtistId, playlist: selectedPlaylist }),
-      ''
-    );
-  };
-
-  const goBack = () => {
-    if (history.length === 0) return;
-    // Read the entry outside the updater: StrictMode double-invokes updaters,
-    // and applyView is a side effect that must run exactly once.
-    const previous = history[history.length - 1];
-    setHistory(h => h.slice(0, -1));
-    applyView(previous);
-    // Also step the browser history back so the URL bar stays in sync.
-    isInternalPop.current = true;
-    window.history.back();
-  };
-
-  // Handle browser Back/Forward buttons via popstate.
+  // Scroll to top on route change
   useEffect(() => {
-    const onPopState = (e: PopStateEvent) => {
-      // If our own goBack() triggered this, the view is already applied.
-      if (isInternalPop.current) {
-        isInternalPop.current = false;
-        return;
-      }
-      const state = e.state as SerializedViewState | null;
-      if (state) {
-        applyView(state);
-      } else {
-        // No state — treat as home (initial entry).
-        applyView({ view: 'home', artistId: null, playlist: null });
-      }
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [applyView]);
+    mainRef.current?.scrollTo({ top: 0 });
+    setIsScrolled(false);
+  }, [location.pathname]);
+
+  // Derive active view and selected item from react-router location
+  const currentView = (() => {
+    if (location.pathname === '/') return 'home';
+    if (location.pathname === '/search') return 'search';
+    if (location.pathname === '/playlists') return 'playlists';
+    if (location.pathname === '/liked' || location.pathname.startsWith('/playlist/')) return 'playlist';
+    if (location.pathname.startsWith('/artist/')) return 'artist';
+    return '';
+  })();
+
+  const selectedPlaylistId = location.pathname.startsWith('/playlist/')
+    ? location.pathname.replace('/playlist/', '')
+    : location.pathname === '/liked'
+    ? 'pl-liked-collection'
+    : undefined;
+
+  const selectedArtistId = location.pathname.startsWith('/artist/')
+    ? location.pathname.replace('/artist/', '')
+    : undefined;
 
   // Sidebar Layout State
   const [isLibraryCollapsed, setIsLibraryCollapsed] = useState<boolean>(false);
@@ -156,50 +95,25 @@ const MainAppContent: React.FC = () => {
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(null);
 
+  const handleNavigate = (viewOrPath: string) => {
+    if (viewOrPath === 'home' || viewOrPath === '/') navigate('/');
+    else if (viewOrPath === 'search' || viewOrPath === '/search') navigate('/search');
+    else if (viewOrPath === 'playlists' || viewOrPath === '/playlists') navigate('/playlists');
+    else if (viewOrPath === 'liked' || viewOrPath === '/liked') navigate('/liked');
+    else if (viewOrPath.startsWith('/')) navigate(viewOrPath);
+    else navigate(`/${viewOrPath}`);
+  };
+
   const handleSelectArtist = (artistId: string) => {
-    pushHistory();
-    setSelectedArtistId(artistId);
-    setCurrentView('artist');
-    mainRef.current?.scrollTo({ top: 0 });
-    setIsScrolled(false);
-    window.history.pushState(
-      serializeViewState({ view: 'artist', artistId, playlist: selectedPlaylist }),
-      ''
-    );
+    navigate(`/artist/${artistId}`);
   };
 
   const handleSelectPlaylist = (playlist: Playlist) => {
-    pushHistory();
-    setSelectedPlaylist(playlist);
-    setCurrentView('playlist');
-    mainRef.current?.scrollTo({ top: 0 });
-    setIsScrolled(false);
-    window.history.pushState(
-      serializeViewState({ view: 'playlist', artistId: selectedArtistId, playlist }),
-      ''
-    );
+    navigate(`/playlist/${playlist.id}`, { state: { playlist } });
   };
 
   const handleSelectLikedSongs = () => {
-    if (!currentUser) return;
-    pushHistory();
-    const likedPlaylist: Playlist = {
-      id: 'pl-liked-collection',
-      title: 'Liked Songs',
-      description: `Your personal library of saved favorites (${currentUser.likedTrackIds?.length || 0} tracks)`,
-      coverUrl: '',
-      trackIds: currentUser.likedTrackIds || [],
-      ownerId: currentUser.id,
-      ownerName: currentUser.name,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-    setSelectedPlaylist(likedPlaylist);
-    setCurrentView('playlist');
-    window.history.pushState(
-      serializeViewState({ view: 'playlist', artistId: selectedArtistId, playlist: likedPlaylist }),
-      ''
-    );
+    navigate('/liked');
   };
 
   const handleOpenAddToPlaylist = (track: Track) => {
@@ -210,7 +124,9 @@ const MainAppContent: React.FC = () => {
     handleSelectPlaylist(newPlaylist);
   };
 
-  // Loading Screen while verifying 30-day cookie
+  const canGoBack = location.key !== 'default' || (typeof window !== 'undefined' && window.history.length > 1);
+
+  // Loading Screen while verifying 30-day session
   if (isLoading) {
     return (
       <div className="h-screen w-screen bg-background flex flex-col items-center justify-center space-y-4">
@@ -249,9 +165,9 @@ const MainAppContent: React.FC = () => {
         <div className="hidden md:block h-full min-h-0">
           <LibrarySidebar
             currentView={currentView}
-            selectedPlaylistId={selectedPlaylist?.id}
-            selectedArtistId={selectedArtistId || undefined}
-            onNavigate={navigate}
+            selectedPlaylistId={selectedPlaylistId}
+            selectedArtistId={selectedArtistId}
+            onNavigate={handleNavigate}
             onSelectPlaylist={handleSelectPlaylist}
             onSelectArtist={handleSelectArtist}
             onSelectLikedSongs={handleSelectLikedSongs}
@@ -275,64 +191,97 @@ const MainAppContent: React.FC = () => {
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
             isScrolled={isScrolled}
-            canGoBack={history.length > 0}
-            onBack={goBack}
+            canGoBack={canGoBack}
+            onBack={() => navigate(-1)}
           />
 
-          {currentView === 'home' && (
-            <HomeView
-              onSelectArtist={handleSelectArtist}
-              onSelectPlaylist={handleSelectPlaylist}
-              onOpenAddToPlaylist={handleOpenAddToPlaylist}
-              onSelectLikedSongs={handleSelectLikedSongs}
-              onOpenUpload={() => setIsUploadOpen(true)}
-              onSeeAllPlaylists={() => navigate('playlists')}
-              onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <HomeView
+                  onSelectArtist={handleSelectArtist}
+                  onSelectPlaylist={handleSelectPlaylist}
+                  onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                  onSelectLikedSongs={handleSelectLikedSongs}
+                  onOpenUpload={() => setIsUploadOpen(true)}
+                  onSeeAllPlaylists={() => navigate('/playlists')}
+                  onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
+                />
+              }
             />
-          )}
-
-          {currentView === 'search' && (
-            <Suspense fallback={<ViewFallback />}>
-              <SearchExploreView
-                query={searchQuery}
-                onQueryChange={setSearchQuery}
-                onSelectArtist={handleSelectArtist}
-                onOpenAddToPlaylist={handleOpenAddToPlaylist}
-              />
-            </Suspense>
-          )}
-
-          {currentView === 'playlists' && (
-            <Suspense fallback={<ViewFallback />}>
-              <PlaylistsDirectoryView
-                onSelectPlaylist={handleSelectPlaylist}
-                onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-                onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
-              />
-            </Suspense>
-          )}
-
-          {currentView === 'artist' && selectedArtistId && (
-            <Suspense fallback={<ViewFallback />}>
-              <ArtistView
-                artistId={selectedArtistId}
-                onBack={goBack}
-                onOpenAddToPlaylist={handleOpenAddToPlaylist}
-              />
-            </Suspense>
-          )}
-
-          {currentView === 'playlist' && selectedPlaylist && (
-            <Suspense fallback={<ViewFallback />}>
-              <PlaylistView
-                playlist={selectedPlaylist}
-                onBack={goBack}
-                onSelectArtist={handleSelectArtist}
-                onOpenAddToPlaylist={handleOpenAddToPlaylist}
-                onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
-              />
-            </Suspense>
-          )}
+            <Route
+              path="/search"
+              element={
+                <Suspense fallback={<ViewFallback />}>
+                  <SearchExploreView
+                    query={searchQuery}
+                    onQueryChange={setSearchQuery}
+                    onSelectArtist={handleSelectArtist}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                  />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/playlists"
+              element={
+                <Suspense fallback={<ViewFallback />}>
+                  <PlaylistsDirectoryView
+                    onSelectPlaylist={handleSelectPlaylist}
+                    onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+                    onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
+                  />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/playlist/:playlistId"
+              element={
+                <Suspense fallback={<ViewFallback />}>
+                  <PlaylistView
+                    onBack={() => navigate(-1)}
+                    onSelectArtist={handleSelectArtist}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
+                  />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/liked"
+              element={
+                <Suspense fallback={<ViewFallback />}>
+                  <PlaylistView
+                    isLikedView={true}
+                    onBack={() => navigate(-1)}
+                    onSelectArtist={handleSelectArtist}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onOpenEditPlaylist={(pl) => setEditingPlaylist(pl)}
+                  />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/artist/:artistId"
+              element={
+                <Suspense fallback={<ViewFallback />}>
+                  <ArtistView
+                    onBack={() => navigate(-1)}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                  />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/track/:trackId"
+              element={<TrackRouteHandler />}
+            />
+            <Route
+              path="*"
+              element={<NotFoundView />}
+            />
+          </Routes>
         </main>
 
         {/* Right: Now Playing Side Panel (Collapsible) */}
@@ -352,15 +301,15 @@ const MainAppContent: React.FC = () => {
           rather than one bar trying to be both. */}
       <div id="player-controls" className="hidden md:block">
         <MiniPlayer 
-        onSelectArtist={handleSelectArtist}
-        onOpenAddToPlaylist={handleOpenAddToPlaylist}
-        isRightSidebarOpen={isRightSidebarOpen}
-        onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+          onSelectArtist={handleSelectArtist}
+          onOpenAddToPlaylist={handleOpenAddToPlaylist}
+          isRightSidebarOpen={isRightSidebarOpen}
+          onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
         />
       </div>
 
       <MobileMiniPlayer />
-      <MobileTabBar currentView={currentView} onNavigate={navigate} />
+      <MobileTabBar currentView={currentView} onNavigate={handleNavigate} />
 
       {/* Fullscreen Player Modal */}
       <NowPlayingModal 
@@ -405,14 +354,12 @@ const MainAppContent: React.FC = () => {
         onClose={() => setEditingPlaylist(null)}
         playlist={editingPlaylist}
         onPlaylistUpdated={(updated) => {
-          if (selectedPlaylist?.id === updated.id) {
-            setSelectedPlaylist(updated);
-          }
+          setEditingPlaylist(null);
         }}
         onPlaylistDeleted={(deletedId) => {
-          if (selectedPlaylist?.id === deletedId) {
-            setSelectedPlaylist(null);
-            navigate('home');
+          setEditingPlaylist(null);
+          if (location.pathname === `/playlist/${deletedId}`) {
+            navigate('/');
           }
         }}
       />
@@ -452,11 +399,13 @@ const MainAppContent: React.FC = () => {
 export function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AudioProvider>
-          <MainAppContent />
-        </AudioProvider>
-      </AuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AudioProvider>
+            <MainAppContent />
+          </AudioProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

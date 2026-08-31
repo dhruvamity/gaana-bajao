@@ -406,6 +406,14 @@ export class DatabaseService {
   }
 
   /**
+   * Get track by ID (uses shared catalogue cache)
+   */
+  public static async getTrackById(trackId: string): Promise<Track | null> {
+    const tracks = await this.getTracks();
+    return tracks.find(t => t.id === trackId) || null;
+  }
+
+  /**
    * Fetch all real playlists (filters out dummy playlists)
    */
   public static async getPlaylists(): Promise<Playlist[]> {
@@ -430,6 +438,14 @@ export class DatabaseService {
       console.warn('Firestore fetch playlists using local cache', e);
       return local;
     }
+  }
+
+  /**
+   * Get playlist by ID
+   */
+  public static async getPlaylistById(playlistId: string): Promise<Playlist | null> {
+    const playlists = await this.getPlaylists();
+    return playlists.find(p => p.id === playlistId) || null;
   }
 
   /**

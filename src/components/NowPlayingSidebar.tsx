@@ -16,6 +16,7 @@ import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { DatabaseService } from '../services/firebase';
 import { CoverArt } from './CoverArt';
+import { showToast } from './Toast';
 
 interface NowPlayingSidebarProps {
   onClose: () => void;
@@ -50,8 +51,10 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
 
   const handleShare = () => {
     logInteraction('share', currentTrack.id);
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = `${window.location.origin}/track/${currentTrack.id}`;
+    navigator.clipboard?.writeText(shareUrl);
     setCopiedShare(true);
+    showToast(`Link to "${currentTrack.title}" copied!`, 'info');
     setTimeout(() => setCopiedShare(false), 2000);
   };
 

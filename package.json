@@ -16,6 +16,7 @@
     "music-metadata": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.3",
     "tailwind-merge": "^3.0.1"
   },
   "devDependencies": {

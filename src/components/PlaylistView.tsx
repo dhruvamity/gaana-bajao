@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Play, 
   Pause, 
@@ -10,15 +11,15 @@ import {
   ChevronLeft, 
   Clock, 
   Music, 
-  Trash2,
-  FolderPlus,
-  Search,
-  Check,
-  ImagePlus,
-  Loader2,
-  RotateCcw,
-  MoreHorizontal,
-  Edit3
+  Trash2, 
+  FolderPlus, 
+  Search, 
+  Check, 
+  ImagePlus, 
+  Loader2, 
+  RotateCcw, 
+  MoreHorizontal, 
+  Edit3 
 } from 'lucide-react';
 import { Playlist, Track } from '../types';
 import { DatabaseService, onTracksChanged } from '../services/firebase';
@@ -28,11 +29,13 @@ import { useAuth } from '../context/AuthContext';
 import { showToast } from './Toast';
 import { CoverArt } from './CoverArt';
 import { PlaylistCover } from './PlaylistCover';
+import { NotFoundView } from './NotFoundView';
 import { getCoverTint, isPlaceholderCover } from '../utils/coverArt';
 
 interface PlaylistViewProps {
-  playlist: Playlist;
-  onBack: () => void;
+  playlist?: Playlist;
+  isLikedView?: boolean;
+  onBack?: () => void;
   onSelectArtist?: (artistId: string) => void;
   onOpenAddToPlaylist?: (track: Track) => void;
   onOpenEditPlaylist?: (playlist: Playlist) => void;
@@ -40,15 +43,22 @@ interface PlaylistViewProps {
 
 export const PlaylistView: React.FC<PlaylistViewProps> = ({ 
   playlist, 
+  isLikedView = false,
   onBack,
   onSelectArtist,
   onOpenAddToPlaylist,
   onOpenEditPlaylist
 }) => {
+  const { playlistId } = useParams<{ playlistId?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { playTrack, playOrToggle, currentTrack, isPlaying, isShuffle, toggleShuffle, logInteraction, addToQueue } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
 
-  const [currentPlaylist, setCurrentPlaylist] = useState<Playlist>(playlist);
+  const [currentPlaylist, setCurrentPlaylist] = useState<Playlist | null>(playlist || null);
+  const [loadingPlaylist, setLoadingPlaylist] = useState<boolean>(!playlist && !isLikedView);
+  const [playlistNotFound, setPlaylistNotFound] = useState<boolean>(false);
+
   const [tracks, setTracks] = useState<Track[]>([]);
   const [allCatalogTracks, setAllCatalogTracks] = useState<Track[]>([]);
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
@@ -62,18 +72,74 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   const [coverBusy, setCoverBusy] = useState<boolean>(false);
   const [coverError, setCoverError] = useState<string | null>(null);
 
-  const hasCustomCover = !isPlaceholderCover(currentPlaylist.coverUrl);
-
-  const isOwnerOrCollaborator = !currentPlaylist.isAlgorithmic && Boolean(
-    (currentUser && currentPlaylist.ownerId === currentUser.id) ||
-    currentPlaylist.collaborators?.some(c => c.id === currentUser?.id)
-  );
-
+  // 1. Handle Liked Songs special route
   useEffect(() => {
-    setCurrentPlaylist(playlist);
+    if (isLikedView || location.pathname === '/liked') {
+      if (!currentUser) return;
+      const likedPlaylist: Playlist = {
+        id: 'pl-liked-collection',
+        title: 'Liked Songs',
+        description: `Your personal library of saved favorites (${currentUser.likedTrackIds?.length || 0} tracks)`,
+        coverUrl: '',
+        trackIds: currentUser.likedTrackIds || [],
+        ownerId: currentUser.id,
+        ownerName: currentUser.name,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      setCurrentPlaylist(likedPlaylist);
+      setLoadingPlaylist(false);
+      setPlaylistNotFound(false);
+    }
+  }, [isLikedView, location.pathname, currentUser?.likedTrackIds, currentUser?.id, currentUser?.name]);
+
+  // 2. Handle passed playlist prop or router location state
+  useEffect(() => {
+    if (playlist) {
+      setCurrentPlaylist(playlist);
+      setLoadingPlaylist(false);
+      setPlaylistNotFound(false);
+    }
   }, [playlist]);
 
+  // 3. Handle cold URL load by playlistId parameter
+  useEffect(() => {
+    if (isLikedView || location.pathname === '/liked' || playlist) return;
+
+    if (!playlistId) {
+      setPlaylistNotFound(true);
+      setLoadingPlaylist(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingPlaylist(true);
+
+    DatabaseService.getPlaylistById(playlistId).then((pl) => {
+      if (!isMounted) return;
+      if (pl) {
+        setCurrentPlaylist(pl);
+        setPlaylistNotFound(false);
+      } else {
+        setPlaylistNotFound(true);
+      }
+      setLoadingPlaylist(false);
+    }).catch((err) => {
+      console.error('Error fetching playlist by ID', err);
+      if (isMounted) {
+        setPlaylistNotFound(true);
+        setLoadingPlaylist(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [playlistId, isLikedView, location.pathname, playlist]);
+
+  // 4. Load tracks when playlist is ready
   const loadData = async () => {
+    if (!currentPlaylist) return;
     const allTracks = await DatabaseService.getTracks();
     setAllCatalogTracks(allTracks);
     const filtered = currentPlaylist.trackIds
@@ -83,12 +149,24 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   };
 
   useEffect(() => {
-    loadData();
-    const unsubscribe = onTracksChanged(() => {
+    if (currentPlaylist) {
       loadData();
-    });
-    return () => unsubscribe();
+      const unsubscribe = onTracksChanged(() => {
+        loadData();
+      });
+      return () => unsubscribe();
+    }
   }, [currentPlaylist]);
+
+  const handleBack = () => {
+    if (onBack) onBack();
+    else navigate(-1);
+  };
+
+  const handleArtistClick = (artistId: string) => {
+    if (onSelectArtist) onSelectArtist(artistId);
+    else navigate(`/artist/${artistId}`);
+  };
 
   const formatDuration = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -100,20 +178,55 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   const totalMinutes = Math.floor(totalDurationSeconds / 60);
 
   const handleShare = () => {
+    if (!currentPlaylist) return;
     if (tracks.length > 0) logInteraction('share', tracks[0]?.id);
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = location.pathname === '/liked'
+      ? `${window.location.origin}/liked`
+      : `${window.location.origin}/playlist/${currentPlaylist.id}`;
+    navigator.clipboard?.writeText(shareUrl);
     setCopiedShare(true);
+    showToast(`Link to "${currentPlaylist.title}" copied!`, 'info');
     setTimeout(() => setCopiedShare(false), 2000);
   };
 
   const handleDeletePlaylist = async () => {
+    if (!currentPlaylist) return;
     setIsMenuOpen(false);
     if (window.confirm(`Are you sure you want to delete "${currentPlaylist.title}"?`)) {
       await DatabaseService.deletePlaylist(currentPlaylist.id);
       showToast(`Playlist "${currentPlaylist.title}" deleted.`, 'info');
-      onBack();
+      handleBack();
     }
   };
+
+  if (loadingPlaylist) {
+    return (
+      <div className="flex-1 min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center animate-pulse">
+          <Loader2 size={28} className="text-primary animate-spin" />
+        </div>
+        <p className="text-xs text-on-surface-variant font-bold tracking-widest uppercase">
+          Loading Playlist...
+        </p>
+      </div>
+    );
+  }
+
+  if (playlistNotFound || !currentPlaylist) {
+    return (
+      <NotFoundView
+        title="Playlist Not Found"
+        message="The playlist you are looking for does not exist, was deleted, or the link is invalid."
+      />
+    );
+  }
+
+  const hasCustomCover = !isPlaceholderCover(currentPlaylist.coverUrl);
+
+  const isOwnerOrCollaborator = !currentPlaylist.isAlgorithmic && Boolean(
+    (currentUser && currentPlaylist.ownerId === currentUser.id) ||
+    currentPlaylist.collaborators?.some(c => c.id === currentUser?.id)
+  );
 
   useEffect(() => {
     if (!isMenuOpen) return;

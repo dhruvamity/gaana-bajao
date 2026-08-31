@@ -307,7 +307,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     label: 'Share Playlist',
                     icon: <Share2 size={14} className="text-on-surface-variant" />,
                     onClick: () => {
-                      navigator.clipboard?.writeText(window.location.href);
+                      const shareUrl = `${window.location.origin}/playlist/${pl.id}`;
+                      navigator.clipboard?.writeText(shareUrl);
                       showToast(`Link to "${pl.title}" copied to clipboard!`, 'info');
                     }
                   },

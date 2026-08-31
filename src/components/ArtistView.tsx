@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Play, 
   Pause, 
@@ -10,7 +11,8 @@ import {
   Users, 
   ChevronLeft,
   Clock,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { Artist, Track } from '../types';
 import { DatabaseService, onTracksChanged } from '../services/firebase';
@@ -18,66 +20,115 @@ import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { FolderPlus } from 'lucide-react';
 import { CoverArt } from './CoverArt';
+import { NotFoundView } from './NotFoundView';
+import { showToast } from './Toast';
 import { getCoverTint } from '../utils/coverArt';
 
 interface ArtistViewProps {
-  artistId: string;
-  onBack: () => void;
+  artistId?: string;
+  onBack?: () => void;
   onOpenAddToPlaylist?: (track: Track) => void;
 }
 
 export const ArtistView: React.FC<ArtistViewProps> = ({ 
-  artistId, 
+  artistId: propArtistId, 
   onBack,
   onOpenAddToPlaylist
 }) => {
+  const { artistId: paramArtistId } = useParams<{ artistId?: string }>();
+  const navigate = useNavigate();
+  const targetArtistId = propArtistId || paramArtistId || '';
+
   const { playTrack, playOrToggle, currentTrack, isPlaying, logInteraction } = useAudio();
   const { currentUser, toggleLikeTrack } = useAuth();
 
   const [artist, setArtist] = useState<Artist | null>(null);
   const [artistTracks, setArtistTracks] = useState<Track[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
 
   useEffect(() => {
-    const loadArtistData = async () => {
-      const target = await DatabaseService.getArtistById(artistId);
-      const tracks = await DatabaseService.getTracks();
-      const filtered = tracks.filter(t => 
-        (target && t.artistId === target.id) || 
-        t.artist.toLowerCase() === (target?.name || artistId).toLowerCase() ||
-        t.artistId === artistId
-      );
+    if (!targetArtistId) {
+      setLoading(false);
+      return;
+    }
 
-      if (target) {
-        setArtist(target);
-      } else if (filtered.length > 0) {
-        // Dynamic fallback artist profile from track
-        const first = filtered[0];
-        setArtist({
-          id: artistId,
-          name: first.artist,
-          bio: `${first.artist} on Gaana-Bajao library.`,
-          avatarUrl: first.coverUrl,
-          bannerUrl: first.coverUrl,
-          monthlyListeners: filtered.length * 450,
-          genres: Array.from(new Set(filtered.map(f => f.genre))),
-          topTrackIds: filtered.map(f => f.id),
-          albumIds: [],
-          velocity: 'Trending'
-        });
+    let isMounted = true;
+    setLoading(true);
+
+    const loadArtistData = async () => {
+      try {
+        const target = await DatabaseService.getArtistById(targetArtistId);
+        const tracks = await DatabaseService.getTracks();
+        const filtered = tracks.filter(t => 
+          (target && t.artistId === target.id) || 
+          t.artist.toLowerCase() === (target?.name || targetArtistId).toLowerCase() ||
+          t.artistId === targetArtistId
+        );
+
+        if (!isMounted) return;
+
+        if (target) {
+          setArtist(target);
+        } else if (filtered.length > 0) {
+          // Dynamic fallback artist profile from track
+          const first = filtered[0];
+          setArtist({
+            id: targetArtistId,
+            name: first.artist,
+            bio: `${first.artist} on Gaana-Bajao library.`,
+            avatarUrl: first.coverUrl,
+            bannerUrl: first.coverUrl,
+            monthlyListeners: filtered.length * 450,
+            genres: Array.from(new Set(filtered.map(f => f.genre))),
+            topTrackIds: filtered.map(f => f.id),
+            albumIds: [],
+            velocity: 'Trending'
+          });
+        } else {
+          setArtist(null);
+        }
+        setArtistTracks(filtered);
+      } catch (err) {
+        console.error('Failed to load artist data', err);
+        if (isMounted) setArtist(null);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setArtistTracks(filtered);
     };
 
     loadArtistData();
     const unsubscribe = onTracksChanged(() => {
       loadArtistData();
     });
-    return () => unsubscribe();
-  }, [artistId]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [targetArtistId]);
 
-  if (!artist) return null;
+  if (loading) {
+    return (
+      <div className="flex-1 min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center animate-pulse">
+          <Loader2 size={28} className="text-primary animate-spin" />
+        </div>
+        <p className="text-xs text-on-surface-variant font-bold tracking-widest uppercase">
+          Loading Artist...
+        </p>
+      </div>
+    );
+  }
+
+  if (!artist) {
+    return (
+      <NotFoundView
+        title="Artist Not Found"
+        message="The artist you are looking for does not exist in this library or has no tracks."
+      />
+    );
+  }
 
   const handleFollow = () => {
     setIsFollowing(!isFollowing);
@@ -86,8 +137,10 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
 
   const handleShare = () => {
     logInteraction('share', artistTracks[0]?.id);
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = `${window.location.origin}/artist/${artist.id}`;
+    navigator.clipboard?.writeText(shareUrl);
     setCopiedShare(true);
+    showToast(`Link to "${artist.name}" copied!`, 'info');
     setTimeout(() => setCopiedShare(false), 2000);
   };
 

@@ -25,6 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import { Track } from '../types';
 import { Scrubber } from './Scrubber';
 import { CoverArt } from './CoverArt';
+import { showToast } from './Toast';
 import { getCoverTint } from '../utils/coverArt';
 
 interface NowPlayingModalProps {
@@ -78,8 +79,10 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
 
   const handleShare = () => {
     logInteraction('share', currentTrack.id);
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = `${window.location.origin}/track/${currentTrack.id}`;
+    navigator.clipboard?.writeText(shareUrl);
     setCopiedShare(true);
+    showToast(`Link to "${currentTrack.title}" copied!`, 'info');
     setTimeout(() => setCopiedShare(false), 2000);
   };
 

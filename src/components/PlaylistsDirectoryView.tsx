@@ -83,7 +83,8 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
   const handleSharePlaylist = (e: React.MouseEvent, playlist: Playlist) => {
     e.stopPropagation();
     setActiveMenuPlaylistId(null);
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = `${window.location.origin}/playlist/${playlist.id}`;
+    navigator.clipboard?.writeText(shareUrl);
     showToast(`Link to "${playlist.title}" copied to clipboard!`, 'info');
   };
 
