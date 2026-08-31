@@ -8,10 +8,11 @@ import {
   ChevronLeft,
   X
 } from 'lucide-react';
-import { Playlist, Artist } from '../types';
+import { Playlist, Artist, Track } from '../types';
 import { DatabaseService } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
+import { PlaylistCover } from './PlaylistCover';
 
 interface LibrarySidebarProps {
   currentView: string;
@@ -50,6 +51,10 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
+  /* Only the collapsed rail renders artwork — the expanded column lists
+     playlists as plain text — so the catalogue needed to build collage covers
+     is fetched only when it can actually be seen. */
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [filterQuery, setFilterQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -65,6 +70,15 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
 
     loadLibrary();
   }, [currentView]);
+
+  useEffect(() => {
+    if (!isCollapsed) return;
+    let cancelled = false;
+    DatabaseService.getTracks().then(all => {
+      if (!cancelled) setTracks(all);
+    });
+    return () => { cancelled = true; };
+  }, [isCollapsed]);
 
   const q = filterQuery.trim().toLowerCase();
   const filteredPlaylists = q
@@ -116,11 +130,10 @@ export const LibrarySidebar: React.FC<LibrarySidebarProps> = ({
               className="w-11 h-11 rounded overflow-hidden hover:scale-105 transition-transform flex-shrink-0"
               title={pl.title}
             >
-              <CoverArt
-                src={pl.coverUrl}
-                title={pl.title}
-                artist={pl.ownerName}
-                id={pl.id}
+              <PlaylistCover
+                playlist={pl}
+                tracks={tracks}
+                size={88}
                 className="w-full h-full object-cover"
               />
             </button>

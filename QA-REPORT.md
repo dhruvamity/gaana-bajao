@@ -1,6 +1,6 @@
 # Gaana-Bajao — QA Execution Report
 
-**Build under test:** `7d89874` (main), clean tree
+**Build under test:** `7d89874` (initial pass); fixes verified on `docs/architecture-and-qa-report`
 **Environment:** Chrome (automation), Vite dev server `localhost:5173`, React StrictMode **on**
 **Session:** guest `user_guest_pvbu8`, 99-track live library, live Firebase project + Cloudinary
 **Date:** 2026-08-31
@@ -39,65 +39,79 @@ events.
 | C — Audio Engine & Telemetry | 5 | 3 | 0 |
 | D — UI/UX & Access Control | 6 | 5 | 0 |
 
-**23 defects.** Five are deploy-blocking. The headline result is not in any of the four
-suites as written: **the live Firestore database is currently readable *and writable* by
-anyone on the internet**, and the repo's `firestore.rules` — the file that would fix that —
-cannot be deployed as-is without breaking three working features.
+**23 defects.** Five were deploy-blocking. The headline result was not in any of the four
+suites as written: it came from reviewing production access control, and is recorded in
+gitignored `SECURITY-PRIVATE.md` rather than here — see *Access control* below.
+
+**Status:** the defects marked ✅ in the register have been fixed on this branch and
+re-verified against a running dev server. The remaining prerequisite for production is a
+**data migration**, not a code change — see *Claiming ownership safely*.
 
 ---
 
-## The blocking result first
+## Access control — tracked privately
 
-An unauthenticated HTTPS request to the Firestore REST API, using only the project id that
-ships inside the client bundle, returned live documents:
+The pass included a review of the production Firestore access rules. The
+findings are **deliberately not published here**: this repository is public, and
+the details are actionable until the corrected rules are deployed.
 
-```
-tracks          -> HTTP 200   docs returned
-users           -> HTTP 200   docs returned
-telemetry       -> HTTP 200   docs returned
-playlists       -> HTTP 200   docs returned
-publicProfiles  -> HTTP 403   PERMISSION_DENIED
-```
+They are recorded in `SECURITY-PRIVATE.md`, which is gitignored, alongside the
+exact verification steps and the order of operations. Anyone with repo access
+who needs them should read that file locally.
 
-`publicProfiles` being the *only* denial is the diagnostic: the repo's rules file contains
-an explicit `publicProfiles` allow-block, so the rules actually running in production are
-an older set that predates it. **`firestore.rules` has never been deployed.**
+What can be said publicly, because it is visible in the diff anyway:
 
-Write access is open too. Cleaning up the QA upload, an unauthenticated `DELETE` on
-`tracks/track_1788121350989_0` returned **HTTP 200** and a follow-up `GET` returned 404.
-Anyone can rewrite any track's `audioUrl` to point at a file of their choosing.
-
-`users` documents carry email, taste vector, liked track ids and recent history. The B2 fix
-removed the app's bulk profile download, but the data behind it is still one anonymous
-`curl` away. **That fix is cosmetic until the rules deploy.**
-
-### …and the rules cannot be deployed as they stand
-
-Deploying today breaks three things:
-
-1. **All 99 tracks have no `ownerId`** (verified: `{"(missing)": 99}`). `validTrack()`
-   requires `ownerId is string` and `ownsExisting()` requires it to equal the caller, so
-   every existing track becomes permanently uneditable and undeletable — by anyone.
-2. **`device_sessions` isn't covered.** `firebase.ts:664` writes to top-level
-   `device_sessions/{deviceId}` and `firebase.ts:677` subscribes to the whole collection.
-   The rules' catch-all denies both. Connect & Handoff stops working. (Today that same
-   collection is a global, unpartitioned list of every device's current track and position.)
-3. **The telemetry query is rejected wholesale.** `getTelemetryEvents()` issues
-   `orderBy('timestamp') limit(100)` with no `where('userId','==',uid)`. Firestore evaluates
-   rules against the *query*, and a query that could match another user's documents is
-   refused. It fails soft to localStorage, so the Firestore telemetry becomes write-only.
-
-### And the obvious remediation has a trap
-
-The QA upload was written with `ownerId: "user_guest_pvbu8"`. A guest has no Firebase
-identity at all — `request.auth` is `null` — so **no rule can ever match a guest-owned
-document.** Running Library Repair's "Claim ownership" from the current guest session would
-stamp that unusable id onto all 99 tracks and quietly make the problem permanent.
-
-> **Correct order: sign in with Google → run Library Repair with Claim ownership →
-> fix `device_sessions` and the telemetry query → deploy rules → verify → hard-refresh.**
+- `firestore.rules` in this repo is **not** what is currently deployed. Deploying
+  it is a prerequisite for production.
+- Deploying it was blocked by three incompatibilities between the rules and the
+  client. **All three are fixed in this branch:** a `device_sessions` match block
+  now exists and its documents carry a `userId`, the device-session listener is
+  scoped with `where('userId','==',uid)`, and the telemetry query carries the
+  same filter so the rules no longer reject it wholesale.
+- One prerequisite remains and is **data, not code**: the 99 existing tracks
+  carry no `ownerId`, so they must be migrated before the rules are enforced or
+  they become permanently read-only. See *Claiming ownership safely* below.
 
 ---
+
+## Claiming ownership safely
+
+`ownerId` is matched against `request.auth.uid`. A guest session has no
+`request.auth` at all, so a `user_guest_*` owner can never satisfy any rule —
+running the migration from a guest session would write an id that is permanently
+unusable, onto all 99 tracks at once.
+
+**Run it signed in with Google.**
+
+1. Open the account menu. If it shows a guest name, **Log out**.
+2. Choose **Continue with Google** and complete the sign-in.
+3. Confirm the session is really a Firebase one before migrating — in DevTools:
+
+   ```js
+   JSON.parse(decodeURIComponent(document.cookie.split('gaana_session_user=')[1])).kind
+   ```
+
+   This must print `"firebase"`. If it prints `"guest"`, stop and sign in again.
+
+4. **Settings → Library Repair → Scan library.** Note the *Claim ownership of
+   pre-existing tracks (N tracks)* count.
+5. Tick **Claim ownership**. Leave artwork and metadata ticked; both report 0
+   targets on the current library, so they are no-ops.
+6. Click **Repair**.
+7. **Rescan.** The ownership count must now be **0**. If it is not, do not
+   deploy the rules yet.
+8. Spot-check one track and confirm `ownerId` is a 28-character Firebase uid,
+   not `user_guest_…`:
+
+   ```js
+   JSON.parse(localStorage.getItem('gaana_tracks'))[0].ownerId
+   ```
+
+Only once step 7 reports 0 is it safe to deploy the rules.
+
+> The repair writes each track individually, so a library of 99 takes a little
+> while. Leave the tab focused; it is not resumable mid-run, though re-running it
+> is safe — tracks that already have an owner are skipped.
 
 ## Suite A — Authentication & Session Management
 
@@ -108,9 +122,9 @@ stamp that unusable id onto all 99 tracks and quietly make the problem permanent
 | Expected | Guest login mints a local profile with no Firebase identity |
 | Actual | `uid: user_guest_pvbu8`, `kind: "guest"`, prefix check passes, shell renders |
 
-Guests genuinely bypass server-side identity — confirmed both by the code path (nothing
-calls Firebase Auth) and by the fact that a guest session successfully read the entire
-`tracks` collection from Firestore, which only the currently-deployed permissive rules allow.
+Guests genuinely bypass server-side identity: nothing in the guest path calls Firebase
+Auth, so `request.auth` is null for every request such a session makes. What that currently
+implies about server-side access is covered in `SECURITY-PRIVATE.md`.
 
 **Finding (medium, shared-device privacy):** "Continue as Guest" does not create a guest. It
 **silently resumes the previous guest's identity** — `firebase.ts:492-497` reuses any
@@ -564,48 +578,54 @@ and the in-app arrow agree, without inventing URL schemes.
 
 ## Defect register
 
+✅ = fixed on this branch and re-verified against a running dev server.
+Line references are to the build under test, before the fix.
+
 ### Deploy-blocking
 
-| # | Defect | Where |
-| --- | --- | --- |
-| 1 | Firestore open to unauthenticated read **and write** on the public internet | deployed rules ≠ `firestore.rules` |
-| 2 | All 99 tracks have no `ownerId` → frozen the moment rules deploy | data |
-| 3 | Guest `ownerId` can never satisfy `request.auth.uid`; claiming ownership as a guest makes it permanent | `UploadModal.tsx:291` |
-| 4 | `device_sessions` not covered by the new rules; Connect & Handoff breaks on deploy | `firebase.ts:664, :677` |
-| 5 | Telemetry query lacks `where userId ==` → rejected wholesale by the new rules | `firebase.ts:~630` |
+| # | Defect | Where | |
+| --- | --- | --- | --- |
+| 1 | Access-control review — details withheld, see `SECURITY-PRIVATE.md` | deployed rules ≠ `firestore.rules` | needs deploy |
+| 2 | All 99 tracks have no `ownerId` → frozen the moment rules deploy | data | **needs migration** |
+| 3 | Guest `ownerId` can never satisfy `request.auth.uid`; claiming ownership as a guest makes it permanent | `UploadModal.tsx:291` | documented — see *Claiming ownership safely* |
+| 4 | `device_sessions` not covered by the new rules; Connect & Handoff breaks on deploy | `firebase.ts:664, :677` | ✅ |
+| 5 | Telemetry query lacks `where userId ==` → rejected wholesale by the new rules | `firebase.ts:~630` | ✅ |
 
 ### High
 
-| # | Defect | Where |
-| --- | --- | --- |
-| 6 | Duplicate `skip_early` on every Next press (reproduced) | `AudioContext.tsx:281` + `:225` |
-| 7 | Volume slider fires one Firestore write per input event (40 → 40 measured) | `AudioContext.tsx:169-187` |
-| 8 | 9 full `tracks` reads per cold load — 891 doc reads, 638 KB (dev; ~4–5 in prod) | `firebase.ts:87`, all consumers |
-| 9 | Repeated arrow keys don't accumulate: 5 presses = 1 step | `Scrubber.tsx:88` |
-| 10 | Play/Pause is tab stop 499 of 508; no skip link | `MediaCard.tsx`, `App.tsx` |
+| # | Defect | Where | |
+| --- | --- | --- | --- |
+| 6 | Duplicate `skip_early` on every Next press (reproduced) | `AudioContext.tsx:281` + `:225` | ✅ |
+| 7 | Volume slider fires one Firestore write per input event (40 → 40 measured) | `AudioContext.tsx:169-187` | ✅ |
+| 8 | 9 full `tracks` reads per cold load — 891 doc reads, 638 KB (dev; ~4–5 in prod) | `firebase.ts:87`, all consumers | open |
+| 9 | Repeated arrow keys don't accumulate: 5 presses = 1 step | `Scrubber.tsx:88` | ✅ |
+| 10 | Play/Pause is tab stop 499 of 508; no skip link | `MediaCard.tsx`, `App.tsx` | open |
+| **24** | **Content column could not be scrolled at all** — `.app-panel { overflow: hidden }` beat Tailwind's `overflow-y-auto` on source order, hiding 9,795 px of every view. Programmatic `scrollTop` still worked, so nothing in the code looked broken. | `index.css:51` | ✅ |
 
 ### Medium
 
-| # | Defect | Where |
-| --- | --- | --- |
-| 11 | `enableAnalyser` not re-entrancy-safe; misreports CORS silencing; latches off permanently | `audioEngine.ts:123` |
-| 12 | Same playlist renders two different generated covers | `HomeView.tsx:199` |
-| 13 | Section headings collapse to 0 px wide on mobile | `SectionHeader.tsx:34` |
-| 14 | Content column is 368 px at a 1024 px viewport | `App.tsx:244` |
-| 15 | Repair button disabled while labelled "Repair 99 tracks" | `LibraryRepairPanel.tsx:302` |
-| 16 | "Continue as Guest" resumes the previous guest's library after logout | `firebase.ts:492` |
-| 17 | `device_sessions` write fails with `invalid-argument` when nothing is playing | `connectSync.ts:47` |
-| 18 | Scrub thumb never appears on keyboard focus | `index.css:238` |
-| 19 | No UI can delete a track; Cloudinary blobs leak | `deleteTrack` uncalled |
+| # | Defect | Where | |
+| --- | --- | --- | --- |
+| 11 | `enableAnalyser` not re-entrancy-safe; misreports CORS silencing; latches off permanently | `audioEngine.ts:123` | open |
+| 12 | Same playlist renders two different generated covers | `HomeView.tsx:199` | ✅ |
+| 13 | Section headings collapse to 0 px wide on mobile | `SectionHeader.tsx:34` | open |
+| 14 | Content column is 368 px at a 1024 px viewport | `App.tsx:244` | open |
+| 15 | Repair button disabled while labelled "Repair 99 tracks" | `LibraryRepairPanel.tsx:302` | open |
+| 16 | "Continue as Guest" resumes the previous guest's library after logout | `firebase.ts:492` | open |
+| 17 | `device_sessions` write fails with `invalid-argument` when nothing is playing | `connectSync.ts:47` | ✅ |
+| 18 | Scrub thumb never appears on keyboard focus | `index.css:238` | ✅ |
+| 19 | No UI can delete a track; Cloudinary blobs leak | `deleteTrack` uncalled | open |
 
 ### Low
 
-| # | Defect | Where |
-| --- | --- | --- |
-| 20 | Guest-prefix exemption ignores the cookie's declared `kind` | `AuthContext.tsx:165` |
-| 21 | `logout()` skips `clearAuthCookie()` if `signOut()` rejects | `AuthContext.tsx:257-267` |
-| 22 | Repeat-one doesn't reset `hasLogged30sRef` | `AudioContext.tsx:267` |
-| 23 | Sub-30 s track would log `stream_complete` **and** `skip_early` (code-derived) | `AudioContext.tsx:281` |
+| # | Defect | Where | |
+| --- | --- | --- | --- |
+| 20 | Guest-prefix exemption ignores the cookie's declared `kind` | `AuthContext.tsx:165` | open |
+| 21 | `logout()` skips `clearAuthCookie()` if `signOut()` rejects | `AuthContext.tsx:257-267` | open |
+| 22 | Repeat-one doesn't reset `hasLogged30sRef` | `AudioContext.tsx:267` | ✅ |
+| 23 | Sub-30 s track would log `stream_complete` **and** `skip_early` (code-derived) | `AudioContext.tsx:281` | ✅ |
+
+**12 fixed, 11 open**, of which one (#2) is a data migration and one (#1) is a deploy.
 
 ---
 
@@ -648,11 +668,5 @@ video/upload/v1788121352/m1buv6uytljvchihimfy.mp3
 image/upload/v1788121353/rbtigkptgxw5f9haigaq.jpg
 ```
 
-**2. Confirm write access for yourself.** The sandbox blocked my explicit unauthenticated-write
-probe; the cleanup DELETE proved it incidentally. Run this to see it directly:
-
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "https://firestore.googleapis.com/v1/projects/$VITE_FIREBASE_PROJECT_ID/databases/(default)/documents/qa_probe/writetest" -H 'Content-Type: application/json' -d '{"fields":{"n":{"stringValue":"x"}}}'
-```
-
-A `200` means anyone on the internet can write to your database right now.
+**2. Verify the rules after deploying.** The check is in `SECURITY-PRIVATE.md` §1 —
+run it once the corrected rules are live and confirm it reports a denial.

@@ -10,6 +10,7 @@ import {
   onSnapshot, 
   Firestore,
   query,
+  where,
   orderBy,
   limit
 } from 'firebase/firestore';
@@ -80,6 +81,31 @@ export function initFirebase(config?: Record<string, string>) {
 // Auto init on import if credentials exist
 initFirebase();
 
+
+/**
+ * Firestore rejects `undefined` outright — one undefined property fails the
+ * entire `setDoc`, not just that field. Optional fields on our own types
+ * (`collaborators`, `collaboratorIds`, `album`, `currentTrackId`, …) are
+ * routinely absent, so every write goes through this first.
+ *
+ * This is not cosmetic: a playlist created without collaborators was rejected
+ * whole and survived only in localStorage, which looked like it had saved
+ * until the next device asked for it.
+ *
+ * Undefined is dropped rather than coerced to null so the field stays absent,
+ * which is what `hasOnly()` shape checks in the security rules expect.
+ */
+function stripUndefined<T extends Record<string, any>>(value: T): T {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (v === undefined) continue;
+    out[k] = v && typeof v === 'object' && !Array.isArray(v) && v.constructor === Object
+      ? stripUndefined(v)
+      : v;
+  }
+  return out as T;
+}
+
 export class DatabaseService {
   /**
    * Fetch all real tracks (purges legacy mock/dummy data automatically)
@@ -120,7 +146,7 @@ export class DatabaseService {
     // 2. Background Firestore write
     if (db) {
       try {
-        await setDoc(doc(db, 'tracks', track.id), track);
+        await setDoc(doc(db, 'tracks', track.id), stripUndefined(track));
       } catch (e) {
         console.warn('Firestore track sync pending/failed', e);
       }
@@ -236,7 +262,7 @@ export class DatabaseService {
 
     if (db) {
       try {
-        await setDoc(doc(db, 'playlists', playlist.id), playlist);
+        await setDoc(doc(db, 'playlists', playlist.id), stripUndefined(playlist));
       } catch (e) {
         console.warn('Firestore playlist sync pending/failed', e);
       }
@@ -526,7 +552,7 @@ export class DatabaseService {
     // 2. Background Firestore write (best-effort)
     if (db) {
       try {
-        await setDoc(doc(db, 'users', user.id), user, { merge: true });
+        await setDoc(doc(db, 'users', user.id), stripUndefined(user), { merge: true });
       } catch (e) {
         console.warn('Firestore user sync warning:', e);
       }
@@ -623,7 +649,7 @@ export class DatabaseService {
 
     if (db) {
       try {
-        await setDoc(doc(db, 'telemetry', event.id), event);
+        await setDoc(doc(db, 'telemetry', event.id), stripUndefined(event));
       } catch (e) {
         console.warn('Firestore telemetry write warning', e);
       }
@@ -631,23 +657,43 @@ export class DatabaseService {
   }
 
   /**
-   * Get all Telemetry Events
+   * This user's telemetry events, most recent first.
+   *
+   * The `userId` filter is not an optimisation — it is what makes the query
+   * legal. Firestore evaluates rules against the QUERY, not the returned rows,
+   * so a query that *could* match another user's documents is refused whole
+   * under `allow read: if resource.data.userId == uid()`. The unfiltered
+   * version of this query also spent its 100-document budget on other users'
+   * events, which `computeCompositeScore` then discarded — quietly starving
+   * the home shelves of the caller's own history.
+   *
+   * Needs the composite index (userId ASC, timestamp DESC); see firestore.indexes.json.
    */
-  public static async getTelemetryEvents(): Promise<TelemetryEvent[]> {
-    if (db) {
+  public static async getTelemetryEvents(userId?: string | null): Promise<TelemetryEvent[]> {
+    const readLocal = (): TelemetryEvent[] => {
+      const local = localStorage.getItem(STORAGE_KEYS.EVENTS);
+      const all: TelemetryEvent[] = local ? JSON.parse(local) : [];
+      return userId ? all.filter(e => e.userId === userId) : all;
+    };
+
+    if (db && userId) {
       try {
-        const q = query(collection(db, 'telemetry'), orderBy('timestamp', 'desc'), limit(100));
+        const q = query(
+          collection(db, 'telemetry'),
+          where('userId', '==', userId),
+          orderBy('timestamp', 'desc'),
+          limit(100)
+        );
         const snap = await getDocs(q);
         if (!snap.empty) {
           return snap.docs.map(d => ({ id: d.id, ...d.data() } as TelemetryEvent));
         }
       } catch (e) {
-        console.warn('Firestore fetch telemetry failed', e);
+        console.warn('Firestore fetch telemetry failed; using local events', e);
       }
     }
 
-    const local = localStorage.getItem(STORAGE_KEYS.EVENTS);
-    return local ? JSON.parse(local) : [];
+    return readLocal();
   }
 
   /**
@@ -661,7 +707,7 @@ export class DatabaseService {
 
     if (db) {
       try {
-        await setDoc(doc(db, 'device_sessions', session.id), session, { merge: true });
+        await setDoc(doc(db, 'device_sessions', session.id), stripUndefined(session), { merge: true });
       } catch (e) {
         console.warn('Firestore device session warning', e);
       }
@@ -671,13 +717,28 @@ export class DatabaseService {
   /**
    * Realtime listener for Device Sessions
    */
-  public static subscribeDeviceSessions(callback: (sessions: DeviceSession[]) => void): () => void {
-    if (db) {
+  /**
+   * Realtime listener for THIS user's device sessions.
+   *
+   * Same rule-compatibility constraint as telemetry: an unfiltered listen on
+   * the whole collection is refused once `device_sessions` is gated on
+   * `userId`. It was also handing every user the full list of every other
+   * user's devices, current track and playback position.
+   */
+  public static subscribeDeviceSessions(
+    userId: string | null | undefined,
+    callback: (sessions: DeviceSession[]) => void
+  ): () => void {
+    if (db && userId) {
       try {
-        return onSnapshot(collection(db, 'device_sessions'), (snap) => {
-          const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() } as DeviceSession));
-          callback(sessions);
-        });
+        const q = query(collection(db, 'device_sessions'), where('userId', '==', userId));
+        return onSnapshot(
+          q,
+          (snap) => {
+            callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as DeviceSession)));
+          },
+          (err) => console.warn('Firestore device sessions listener error', err)
+        );
       } catch (e) {
         console.warn('Firestore device sessions listener error', e);
       }

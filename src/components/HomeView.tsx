@@ -6,6 +6,7 @@ import { RecommendationEngine } from '../services/recommendationEngine';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
+import { PlaylistCover } from './PlaylistCover';
 import { MediaCard } from './MediaCard';
 import { SectionHeader } from './SectionHeader';
 
@@ -51,7 +52,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         DatabaseService.getTracks(),
         DatabaseService.getPlaylists(),
         DatabaseService.getArtists(),
-        DatabaseService.getTelemetryEvents()
+        DatabaseService.getTelemetryEvents(currentUser?.id)
       ]);
       setTracks(allTracks);
       setPlaylists(allPlaylists);
@@ -60,7 +61,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     };
 
     loadData();
-  }, []);
+  }, [currentUser?.id]);
 
   const getGreeting = () => {
     switch (timeOfDay) {
@@ -195,6 +196,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   <div className="w-tile h-tile bg-gradient-to-br from-[#450af5] to-[#8e8ee5] flex items-center justify-center flex-shrink-0">
                     <Heart size={28} fill="currentColor" className="text-white" />
                   </div>
+                ) : card.playlist ? (
+                  <PlaylistCover
+                    playlist={card.playlist}
+                    tracks={tracks}
+                    size={164}
+                    className="w-tile h-tile object-cover flex-shrink-0"
+                  />
                 ) : (
                   <CoverArt
                     src={card.coverUrl}
