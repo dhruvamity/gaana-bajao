@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Wand2, Search, AlertCircle, Check, Image as ImageIcon, Tag, Loader2, ShieldCheck, Info } from 'lucide-react';
 import {
@@ -59,6 +59,20 @@ export const LibraryRepairPanel: React.FC = () => {
   const [restoreArtwork, setRestoreArtwork] = useState(true);
   const [restoreMetadata, setRestoreMetadata] = useState(true);
   const [claimOwnership, setClaimOwnership] = useState(true);
+
+  /* What the button will actually touch, given the boxes currently ticked.
+     `scan.repairable` counts everything repairable by ANY option, so using it
+     as the label overstated the job whenever an option was unticked. This
+     mirrors the predicate repairLibrary() itself uses. */
+  const repairTargetCount = useMemo(() => {
+    if (!scan) return 0;
+    return scan.results.filter(
+      r =>
+        (restoreArtwork && r.needsArt && r.hasEmbeddedArt) ||
+        (restoreMetadata && r.proposedChanges.length > 0) ||
+        (claimOwnership && !!currentUser && r.missingOwner)
+    ).length;
+  }, [scan, restoreArtwork, restoreMetadata, claimOwnership, currentUser]);
 
   const handleScan = async () => {
     setPhase('scanning');
@@ -295,15 +309,21 @@ export const LibraryRepairPanel: React.FC = () => {
           <span>{scan ? 'Rescan library' : 'Scan library'}</span>
         </button>
 
-        {scan && scan.repairable > 0 && (
+        {scan && repairTargetCount > 0 && (
           <button
             type="button"
             onClick={handleRepair}
-            disabled={busy || (!restoreArtwork && !restoreMetadata)}
+            /* Ownership counts as work. Leaving it out of this check disabled
+               the button whenever artwork and metadata had no targets — which
+               is exactly the state a library in the ownership migration is in,
+               so the one repair that actually needed running was the one that
+               could not be started, under a button still labelled with its
+               own track count. */
+            disabled={busy || (!restoreArtwork && !restoreMetadata && !claimOwnership)}
             className="px-5 py-2 rounded bg-primary hover:bg-primary-fixed text-on-primary text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 transition-colors"
           >
             {phase === 'repairing' ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-            <span>Repair {scan.repairable} track{scan.repairable === 1 ? '' : 's'}</span>
+            <span>Repair {repairTargetCount} track{repairTargetCount === 1 ? '' : 's'}</span>
           </button>
         )}
       </div>

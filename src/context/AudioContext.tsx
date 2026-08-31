@@ -18,6 +18,12 @@ interface AudioContextType {
   isNowPlayingOpen: boolean;
   isQueueOpen: boolean;
   isConnectOpen: boolean;
+  /**
+   * Why the current track will not play, or null. Set from the media element's
+   * own error event, so a missing or unplayable source surfaces in the UI
+   * instead of leaving the player claiming to be playing forever.
+   */
+  playbackError: string | null;
   /** Reads live analyser output. Call from your own animation frame. */
   getFrequencyData: () => Uint8Array;
   /**
@@ -70,6 +76,25 @@ const PLAYBACK_HEARTBEAT_MS = 15000;
  */
 const VOLUME_SYNC_DEBOUNCE_MS = 600;
 
+/**
+ * Turn a MediaError code into something a listener can act on.
+ *
+ * Code 4 is the one that matters here: it is what the element reports when the
+ * URL resolves but the bytes are not there — a deleted or expired object in
+ * media storage. Track documents live in Firestore and are completely
+ * independent of the blobs, so clearing storage leaves a full-looking library
+ * in which nothing can play.
+ */
+function describeMediaError(code?: number): string {
+  switch (code) {
+    case 1: return 'Playback was interrupted.';
+    case 2: return 'Network error while loading this track.';
+    case 3: return 'This track could not be decoded — the file may be damaged.';
+    case 4: return "This track's audio is missing from storage — it may have been deleted.";
+    default: return 'This track could not be played.';
+  }
+}
+
 /** Shared zero-filled buffer returned when no analyser is available. */
 const EMPTY_FREQUENCY_DATA = new Uint8Array(32);
 
@@ -86,6 +111,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [queue, setQueue] = useState<Track[]>([]);
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const [isRepeat, setIsRepeat] = useState<boolean>(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   
   // UI Panels
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(false);
@@ -281,6 +307,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     setCurrentTrack(track);
+    setPlaybackError(null);
     hasLogged30sRef.current = false;
     playStartTimeRef.current = Date.now();
 
@@ -291,7 +318,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     audioEngineRef.current.setSource(track.audioUrl);
-    audioEngineRef.current.play().catch(e => console.warn('Autoplay prevented', e));
+    audioEngineRef.current.play().catch(e => {
+      // A rejected play() is usually the autoplay policy; the element's own
+      // `error` event covers an unusable source and sets a better message.
+      if (e?.name === 'NotAllowedError') {
+        setIsPlaying(false);
+        setPlaybackError('Press play to start — your browser blocked automatic playback.');
+      }
+      console.warn('Play request rejected', e);
+    });
     setIsPlaying(true);
   };
 
@@ -428,7 +463,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       },
       onPlay: () => setIsPlaying(true),
       onPause: () => setIsPlaying(false),
-      onError: (err) => console.warn('Audio playback error', err)
+      onError: (err) => {
+        /* Previously this only warned to the console: the element stopped, but
+           isPlaying stayed true, so the bar kept showing a pause button over a
+           timer frozen at 0:00 and nothing told the listener anything. */
+        const code = (err as MediaError | null)?.code;
+        setIsPlaying(false);
+        setPlaybackError(describeMediaError(code));
+        console.warn('Audio playback error', err);
+      }
     };
   });
 
@@ -446,6 +489,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isNowPlayingOpen,
         isQueueOpen,
         isConnectOpen,
+        playbackError,
         getFrequencyData,
         enableAnalyser,
         playTrack,
