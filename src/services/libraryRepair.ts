@@ -30,6 +30,18 @@ export interface TrackScanResult {
   proposedChanges: Array<{ field: keyof Track; from: string; to: string }>;
   /** Track predates ownership and cannot be written once rules are enforced. */
   missingOwner: boolean;
+  /**
+   * The media host answered *definitively* that the audio is gone — 404 or 410.
+   *
+   * Deliberately narrower than the `unreadable` diagnosis, which also covers
+   * CORS rejections and transient network failures. Removal keys off this flag
+   * and nothing else, because deleting a track on a temporary blip would be
+   * unrecoverable: the audio is already gone from storage, so the document is
+   * the only record that the track ever existed.
+   */
+  sourceMissing: boolean;
+  /** HTTP status the media host returned, when it returned one at all. */
+  httpStatus: number | null;
   /** Why this track yielded nothing, when it yielded nothing. */
   diagnosis: Diagnosis;
   detail?: string;
@@ -45,7 +57,8 @@ export type Diagnosis =
   | 'artwork-available'    // embedded art present and recoverable
   | 'tags-no-artwork'      // tags read, but the file has no picture frame
   | 'stripped-on-host'     // valid audio, ID3 tag absent from the stored copy
-  | 'unreadable'           // could not fetch or parse
+  | 'source-missing'       // host said 404/410 — the audio object is gone
+  | 'unreadable'           // could not fetch or parse, reason unknown
   | 'already-correct';     // nothing to do
 
 export interface ScanSummary {
@@ -56,6 +69,8 @@ export interface ScanSummary {
   needingArt: number;
   repairable: number;
   missingOwner: number;
+  /** Tracks whose audio object no longer exists. Removable, not repairable. */
+  missingSource: number;
   /** Count of tracks per diagnosis, so the outcome can be explained precisely. */
   byDiagnosis: Record<Diagnosis, number>;
   results: TrackScanResult[];
@@ -99,6 +114,8 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
     needsArt: isPlaceholderCover(track.coverUrl),
     proposedChanges: [],
     missingOwner: !track.ownerId,
+    sourceMissing: false,
+    httpStatus: null,
     diagnosis: 'unreadable'
   };
 
@@ -115,13 +132,18 @@ export async function scanTrack(track: Track): Promise<TrackScanResult> {
     return result;
   }
 
+  result.httpStatus = probe.httpStatus;
+  // 404/410 are the host stating the object is gone. A thrown fetch leaves
+  // httpStatus null, which must NOT be treated as missing.
+  result.sourceMissing = probe.httpStatus === 404 || probe.httpStatus === 410;
+
   result.detail =
     `HTTP ${probe.httpStatus ?? '-'} | container ${probe.container ?? '-'} | ` +
     `${(probe.bytesRead / 1024).toFixed(1)} KB read`;
 
   if (!probe.ok) {
     result.error = probe.error ?? 'Could not read tags';
-    result.diagnosis = 'unreadable';
+    result.diagnosis = result.sourceMissing ? 'source-missing' : 'unreadable';
     return result;
   }
 
@@ -201,6 +223,7 @@ export async function scanLibrary(
     'artwork-available': 0,
     'tags-no-artwork': 0,
     'stripped-on-host': 0,
+    'source-missing': 0,
     'unreadable': 0,
     'already-correct': 0
   };
@@ -213,6 +236,7 @@ export async function scanLibrary(
     withTags: results.filter(r => r.hasTags).length,
     needingArt: results.filter(r => r.needsArt).length,
     missingOwner: results.filter(r => r.missingOwner).length,
+    missingSource: results.filter(r => r.sourceMissing).length,
     repairable: results.filter(
       r => (r.needsArt && r.hasEmbeddedArt) || r.proposedChanges.length > 0 || r.missingOwner
     ).length,
@@ -319,6 +343,53 @@ export async function repairLibrary(
       });
     }
 
+    onProgress?.(++done, targets.length, target.currentTitle);
+  }
+
+  return summary;
+}
+
+export interface RemovalSummary {
+  attempted: number;
+  removed: number;
+  failed: Array<{ trackId: string; title: string; error: string }>;
+}
+
+/**
+ * Delete the catalogue entries whose audio object no longer exists.
+ *
+ * Only touches results flagged `sourceMissing` — a definitive 404/410 from the
+ * media host. A track that merely failed to load (CORS, a dropped connection,
+ * a host hiccup) is never removed, because the audio is already unrecoverable
+ * and the document is the only remaining record that the track existed.
+ *
+ * `deleteTrack` also pulls the id out of every playlist that referenced it, so
+ * removal does not leave playlists pointing at nothing.
+ */
+export async function removeMissingSourceTracks(
+  scan: ScanSummary,
+  onProgress?: (done: number, total: number, label: string) => void
+): Promise<RemovalSummary> {
+  const targets = scan.results.filter(r => r.sourceMissing);
+
+  const summary: RemovalSummary = {
+    attempted: targets.length,
+    removed: 0,
+    failed: []
+  };
+
+  let done = 0;
+  for (const target of targets) {
+    try {
+      await DatabaseService.deleteTrack(target.trackId);
+      summary.removed++;
+    } catch (err: any) {
+      summary.failed.push({
+        trackId: target.trackId,
+        title: target.currentTitle,
+        error: err?.message || 'Could not remove this track'
+      });
+    }
     onProgress?.(++done, targets.length, target.currentTitle);
   }
 
