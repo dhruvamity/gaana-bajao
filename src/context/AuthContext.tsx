@@ -204,6 +204,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [syncSessionCookie]);
 
+  // Real-time synchronization of user profile (liked tracks, playlists, taste) across devices
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const unsub = DatabaseService.subscribeUserProfile(currentUser.id, (freshUser) => {
+      setCurrentUser(prev => {
+        if (!prev) return freshUser;
+        const sameLikes = prev.likedTrackIds?.length === freshUser.likedTrackIds?.length &&
+          prev.likedTrackIds?.every((id, idx) => id === freshUser.likedTrackIds?.[idx]);
+        const sameName = prev.name === freshUser.name;
+        const sameAvatar = prev.avatar === freshUser.avatar;
+        const sameOnboarded = prev.isOnboarded === freshUser.isOnboarded;
+        if (sameLikes && sameName && sameAvatar && sameOnboarded) return prev;
+        return { ...prev, ...freshUser };
+      });
+    });
+    return () => unsub();
+  }, [currentUser?.id]);
+
   const loginWithGoogle = async (): Promise<UserProfile> => {
     loginInProgressRef.current = true;
     setIsLoading(true);
@@ -218,9 +236,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return userProfile;
     } catch (err: any) {
       // If redirect is in progress, don't clear loading — page will redirect
-      if (err.message === 'REDIRECT_IN_PROGRESS') {
-        // Keep loading spinner — the page will navigate away
-        throw err;
+      if (err?.code === 'auth/redirect-in-progress') {
+        return {} as UserProfile;
       }
       throw err;
     } finally {
@@ -231,6 +248,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setIsLoading(true);
+    try {
+      await ConnectSyncService.unregisterCurrentDevice();
+    } catch {}
     try {
       await DatabaseService.logout();
     } catch (e) {

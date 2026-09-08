@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Track, TelemetryEvent, InteractionType } from '../types';
+import { Track, TelemetryEvent, InteractionType, DeviceSession, RemoteCommand } from '../types';
 import { AudioEngine } from '../services/audioEngine';
 import { DatabaseService, initRealtimeTracksSync } from '../services/firebase';
 import { RecommendationEngine } from '../services/recommendationEngine';
@@ -25,6 +25,14 @@ interface AudioContextType {
    * instead of leaving the player claiming to be playing forever.
    */
   playbackError: string | null;
+
+  // Connect & Handoff Multi-Device state (Spotify / Amazon Music style)
+  remoteActiveDevice: DeviceSession | null;
+  connectedDevices: DeviceSession[];
+  transferPlaybackToDevice: (targetDeviceId: string) => Promise<void>;
+  sendRemoteCommand: (command: Omit<RemoteCommand, 'issuedAt' | 'issuedByDeviceId'>) => Promise<void>;
+  takeOverPlaybackHere: () => Promise<void>;
+
   /** Reads live analyser output. Call from your own animation frame. */
   getFrequencyData: () => Uint8Array;
   /**
@@ -119,10 +127,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isQueueOpen, setIsQueueOpen] = useState<boolean>(false);
   const [isConnectOpen, setIsConnectOpen] = useState<boolean>(false);
 
+  // Multi-Device Remote Playback State (Spotify Connect & Amazon Music style)
+  const [remoteActiveDevice, setRemoteActiveDevice] = useState<DeviceSession | null>(null);
+  const [connectedDevices, setConnectedDevices] = useState<DeviceSession[]>([]);
+  const lastProcessedCommandRef = useRef<number>(0);
+
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const playStartTimeRef = useRef<number>(0);
   const hasLogged30sRef = useRef<boolean>(false);
   const consecutiveErrorsRef = useRef<number>(0);
+
+  const isPlayingRef = useRef<boolean>(isPlaying);
+  isPlayingRef.current = isPlaying;
 
   // Synchronous state refs to prevent stale closure reads in asynchronous media callbacks (Fix 14)
   const currentTrackRef = useRef<Track | null>(currentTrack);
@@ -253,11 +269,31 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => unsub();
   }, []);
 
+  // Keep session live so other devices can discover and connect to it
   useEffect(() => {
-    if (!isPlaying) return;
-    const id = window.setInterval(broadcastNow, PLAYBACK_HEARTBEAT_MS);
+    if (!currentUser?.id) return;
+    const intervalMs = isPlaying ? PLAYBACK_HEARTBEAT_MS : 25000;
+    const id = window.setInterval(broadcastNow, intervalMs);
     return () => window.clearInterval(id);
-  }, [isPlaying, broadcastNow]);
+  }, [isPlaying, currentUser?.id, broadcastNow]);
+
+  // Cleanly report inactive when tab or window closes
+  useEffect(() => {
+    const handleUnload = () => {
+      if (currentUser?.id) {
+        ConnectSyncService.broadcastState({
+          userId: currentUser.id,
+          isPlaying: false,
+          isActivePlayback: false,
+          currentTrackId: '',
+          progressSeconds: 0,
+          volume: volumeRef.current
+        });
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [currentUser?.id]);
 
   /* Volume settles into a single write. The first run is skipped so mounting
      does not publish a redundant broadcast alongside the transition effect
@@ -481,6 +517,195 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const currentDeviceId = ConnectSyncService.getOrCreateDeviceId();
+
+  const executeRemoteCommand = useCallback(async (cmd: RemoteCommand) => {
+    switch (cmd.type) {
+      case 'transfer': {
+        if (cmd.trackId) {
+          const catalog = await DatabaseService.getTracks();
+          const targetTrack = catalog.find(t => t.id === cmd.trackId);
+          if (targetTrack) {
+            let targetQueue: Track[] | undefined;
+            if (cmd.queueTrackIds && cmd.queueTrackIds.length > 0) {
+              targetQueue = cmd.queueTrackIds
+                .map(id => catalog.find(t => t.id === id))
+                .filter((t): t is Track => Boolean(t));
+            }
+            startTrack(targetTrack, targetQueue, { userInitiated: false });
+            if (typeof cmd.progressSeconds === 'number' && cmd.progressSeconds > 0) {
+              setTimeout(() => {
+                seek(cmd.progressSeconds || 0);
+              }, 150);
+            }
+            playStartTimeRef.current = Date.now();
+            showToast(`Playback transferred to this device`, 'info');
+          }
+        }
+        break;
+      }
+      case 'play': {
+        if (currentTrackRef.current) {
+          audioEngineRef.current?.play().catch(() => {});
+          setIsPlaying(true);
+          playStartTimeRef.current = Date.now();
+        }
+        break;
+      }
+      case 'pause': {
+        audioEngineRef.current?.pause();
+        setIsPlaying(false);
+        break;
+      }
+      case 'next': {
+        advance({ userInitiated: true });
+        break;
+      }
+      case 'prev': {
+        prevTrack();
+        break;
+      }
+      case 'seek': {
+        if (typeof cmd.progressSeconds === 'number') {
+          seek(cmd.progressSeconds);
+        }
+        break;
+      }
+      case 'volume': {
+        if (typeof cmd.volume === 'number') {
+          setVolume(cmd.volume);
+        }
+        break;
+      }
+    }
+  }, []);
+
+  // Real-time synchronization of device sessions and single-stream playback enforcement
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setConnectedDevices([]);
+      setRemoteActiveDevice(null);
+      return;
+    }
+
+    const handleSessions = async (sessions: DeviceSession[]) => {
+      const now = Date.now();
+      // Keep devices active in the last 45s
+      const activeSessions = sessions.filter(s => (now - s.lastUpdated) < 45000);
+      setConnectedDevices(activeSessions);
+
+      // Find if another device is active and playing
+      const remotePlaying = activeSessions.find(s => s.id !== currentDeviceId && s.isActivePlayback && s.isPlaying);
+      setRemoteActiveDevice(remotePlaying || null);
+
+      // Spotify / Amazon Music exclusivity:
+      // If another device started playing after our local play started, pause locally
+      if (remotePlaying && isPlayingRef.current && remotePlaying.lastUpdated > playStartTimeRef.current) {
+        audioEngineRef.current?.pause();
+        setIsPlaying(false);
+        showToast(`Playback paused — listening on ${remotePlaying.name}`, 'info');
+      }
+
+      // Check if this device has an incoming command from Firestore
+      const mySession = sessions.find(s => s.id === currentDeviceId);
+      if (mySession?.pendingCommand && mySession.pendingCommand.issuedAt > lastProcessedCommandRef.current) {
+        const cmd = mySession.pendingCommand;
+        lastProcessedCommandRef.current = cmd.issuedAt;
+        await executeRemoteCommand(cmd);
+        DatabaseService.clearDeviceCommand(currentDeviceId);
+      }
+    };
+
+    const unsubSessions = DatabaseService.subscribeDeviceSessions(currentUser.id, handleSessions);
+    const unsubLocalCommands = ConnectSyncService.onRemoteCommand(async (cmd) => {
+      if (cmd.issuedAt > lastProcessedCommandRef.current) {
+        lastProcessedCommandRef.current = cmd.issuedAt;
+        await executeRemoteCommand(cmd);
+      }
+    });
+
+    return () => {
+      unsubSessions();
+      unsubLocalCommands();
+    };
+  }, [currentUser?.id, currentDeviceId, executeRemoteCommand]);
+
+  const transferPlaybackToDevice = useCallback(async (targetDeviceId: string) => {
+    const target = connectedDevices.find(d => d.id === targetDeviceId);
+    if (!currentTrack) {
+      showToast('Select a track to transfer playback', 'info');
+      return;
+    }
+
+    // Pause local audio
+    audioEngineRef.current?.pause();
+    setIsPlaying(false);
+
+    // Send transfer command to target device
+    await ConnectSyncService.sendRemoteCommand(targetDeviceId, {
+      type: 'transfer',
+      trackId: currentTrack.id,
+      progressSeconds: progressRef.current,
+      queueTrackIds: queueRef.current.map(t => t.id),
+      issuedAt: Date.now(),
+      issuedByDeviceId: currentDeviceId
+    });
+
+    // Mark this device as no longer active
+    await ConnectSyncService.broadcastState({
+      userId: currentUser?.id,
+      isPlaying: false,
+      isActivePlayback: false,
+      currentTrackId: currentTrack.id,
+      progressSeconds: progressRef.current,
+      volume: volumeRef.current
+    });
+
+    showToast(`Transferring playback to ${target?.name || 'device'}...`, 'info');
+  }, [connectedDevices, currentTrack, currentDeviceId, currentUser?.id]);
+
+  const sendRemoteCommand = useCallback(async (command: Omit<RemoteCommand, 'issuedAt' | 'issuedByDeviceId'>) => {
+    if (!remoteActiveDevice) return;
+    await ConnectSyncService.sendRemoteCommand(remoteActiveDevice.id, {
+      ...command,
+      issuedAt: Date.now(),
+      issuedByDeviceId: currentDeviceId
+    });
+  }, [remoteActiveDevice, currentDeviceId]);
+
+  const takeOverPlaybackHere = useCallback(async () => {
+    if (!remoteActiveDevice) return;
+    const remote = remoteActiveDevice;
+
+    // Command the remote device to pause
+    await ConnectSyncService.sendRemoteCommand(remote.id, {
+      type: 'pause',
+      issuedAt: Date.now(),
+      issuedByDeviceId: currentDeviceId
+    });
+
+    // Start playing here
+    if (remote.currentTrackId) {
+      const catalog = await DatabaseService.getTracks();
+      const track = catalog.find(t => t.id === remote.currentTrackId);
+      if (track) {
+        startTrack(track, undefined, { userInitiated: true });
+        if (remote.progressSeconds) {
+          setTimeout(() => {
+            seek(remote.progressSeconds);
+          }, 150);
+        }
+      }
+    } else if (currentTrackRef.current) {
+      audioEngineRef.current?.play().catch(() => {});
+      setIsPlaying(true);
+      playStartTimeRef.current = Date.now();
+    }
+
+    setRemoteActiveDevice(null);
+    showToast(`Now playing on ${ConnectSyncService.getDeviceName()}`, 'info');
+  }, [remoteActiveDevice, currentDeviceId]);
+
   // Refresh the media-event handlers after every render so the stable listeners
   // registered on the engine always dispatch into current state.
   useEffect(() => {
@@ -580,7 +805,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsNowPlayingOpen,
         setIsQueueOpen,
         setIsConnectOpen,
-        logInteraction
+        logInteraction,
+        remoteActiveDevice,
+        connectedDevices,
+        transferPlaybackToDevice,
+        sendRemoteCommand,
+        takeOverPlaybackHere
       }}
     >
       {children}

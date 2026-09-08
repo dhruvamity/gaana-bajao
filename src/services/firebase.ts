@@ -12,7 +12,9 @@ import {
   query,
   where,
   orderBy,
-  limit
+  limit,
+  updateDoc,
+  deleteField
 } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -25,7 +27,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser 
 } from 'firebase/auth';
-import { Track, Playlist, UserProfile, PublicProfile, TelemetryEvent, DeviceSession, Artist } from '../types';
+import { Track, Playlist, UserProfile, PublicProfile, TelemetryEvent, DeviceSession, Artist, RemoteCommand } from '../types';
 import { slugifyArtistId } from '../utils/artistId';
 import { isAudioUrlMissing } from './metadataService';
 
@@ -1018,6 +1020,49 @@ export class DatabaseService {
   }
 
   /**
+   * Realtime listener for User Profile (likes, taste, playlists sync across devices)
+   */
+  public static subscribeUserProfile(
+    userId: string | null | undefined,
+    callback: (user: UserProfile) => void
+  ): () => void {
+    if (db && userId) {
+      try {
+        const userRef = doc(db, 'users', userId);
+        return onSnapshot(
+          userRef,
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              const user: UserProfile = {
+                id: snap.id,
+                name: data.name || 'Music Fan',
+                email: data.email,
+                avatar: data.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${snap.id}`,
+                bio: data.bio,
+                isOnboarded: Boolean(data.isOnboarded),
+                selectedGenres: data.selectedGenres || [],
+                selectedVibes: data.selectedVibes || [],
+                likedTrackIds: data.likedTrackIds || [],
+                savedPlaylistIds: data.savedPlaylistIds || [],
+                recentTrackIds: data.recentTrackIds || [],
+                tasteVector: data.tasteVector
+              };
+              // Keep cached profile updated locally
+              this.saveUserSync(user).catch(() => {});
+              callback(user);
+            }
+          },
+          (err) => console.warn('Firestore user profile listener error', err)
+        );
+      } catch (e) {
+        console.warn('Firestore user profile subscription error', e);
+      }
+    }
+    return () => {};
+  }
+
+  /**
    * Update a Device Session (playback state & position)
    */
   public static async updateDeviceSession(session: DeviceSession): Promise<void> {
@@ -1025,6 +1070,15 @@ export class DatabaseService {
     const sessions: DeviceSession[] = raw ? JSON.parse(raw) : [];
     const updated = [session, ...sessions.filter(s => s.id !== session.id)];
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
+
+    // Broadcast across local tabs immediately
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('gaana_device_presence');
+        bc.postMessage({ type: 'presence', device: session });
+        bc.close();
+      }
+    } catch {}
 
     if (db) {
       await withWriteRetry('Device session update', () =>
@@ -1034,34 +1088,134 @@ export class DatabaseService {
   }
 
   /**
-   * Realtime listener for Device Sessions
+   * Delete a Device Session (on logout or tab close)
    */
+  public static async deleteDeviceSession(deviceId: string): Promise<void> {
+    const raw = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+    if (raw) {
+      const sessions: DeviceSession[] = JSON.parse(raw);
+      const updated = sessions.filter(s => s.id !== deviceId);
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
+    }
+
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('gaana_device_presence');
+        bc.postMessage({ type: 'offline', deviceId });
+        bc.close();
+      }
+    } catch {}
+
+    if (db && deviceId) {
+      try {
+        await deleteDoc(doc(db, 'device_sessions', deviceId));
+      } catch (err) {
+        console.warn('Failed to delete device session:', err);
+      }
+    }
+  }
+
+  /**
+   * Send a remote command (transfer, play, pause, next, prev, volume, seek) to another device
+   */
+  public static async sendDeviceCommand(targetDeviceId: string, command: RemoteCommand): Promise<void> {
+    // 1. Broadcast locally for instant local delivery (< 5ms)
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('gaana_device_command');
+        bc.postMessage({ targetDeviceId, command });
+        bc.close();
+      }
+    } catch {}
+
+    // 2. Persist to Firestore so remote browsers / devices receive it in real-time
+    if (db && targetDeviceId) {
+      await withWriteRetry('Send device command', () =>
+        setDoc(
+          doc(db!, 'device_sessions', targetDeviceId),
+          {
+            pendingCommand: stripUndefined(command),
+            lastUpdated: Date.now()
+          },
+          { merge: true }
+        )
+      );
+    }
+  }
+
+  /**
+   * Clear processed command from a device session
+   */
+  public static async clearDeviceCommand(deviceId: string): Promise<void> {
+    if (db && deviceId) {
+      try {
+        await updateDoc(doc(db, 'device_sessions', deviceId), {
+          pendingCommand: deleteField()
+        });
+      } catch {
+        // Fallback merge null
+        try {
+          await setDoc(doc(db, 'device_sessions', deviceId), { pendingCommand: null }, { merge: true });
+        } catch {}
+      }
+    }
+  }
+
   /**
    * Realtime listener for THIS user's device sessions.
-   *
-   * Same rule-compatibility constraint as telemetry: an unfiltered listen on
-   * the whole collection is refused once `device_sessions` is gated on
-   * `userId`. It was also handing every user the full list of every other
-   * user's devices, current track and playback position.
    */
   public static subscribeDeviceSessions(
     userId: string | null | undefined,
     callback: (sessions: DeviceSession[]) => void
   ): () => void {
+    let unsubs: Array<() => void> = [];
+
+    // Local BroadcastChannel for instant cross-tab presence
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const channel = new BroadcastChannel('gaana_device_presence');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'presence' && event.data.device) {
+            const raw = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+            const sessions: DeviceSession[] = raw ? JSON.parse(raw) : [];
+            const device = event.data.device as DeviceSession;
+            if (device.userId === userId) {
+              const updated = [device, ...sessions.filter(s => s.id !== device.id)];
+              localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
+              callback(updated);
+            }
+          } else if (event.data?.type === 'offline' && event.data.deviceId) {
+            const raw = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+            const sessions: DeviceSession[] = raw ? JSON.parse(raw) : [];
+            const updated = sessions.filter(s => s.id !== event.data.deviceId);
+            localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
+            callback(updated);
+          }
+        };
+        unsubs.push(() => channel.close());
+      }
+    } catch {}
+
+    // Firestore Realtime Listener
     if (db && userId) {
       try {
         const q = query(collection(db, 'device_sessions'), where('userId', '==', userId));
-        return onSnapshot(
+        const firestoreUnsub = onSnapshot(
           q,
           (snap) => {
-            callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as DeviceSession)));
+            const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as DeviceSession));
+            callback(items);
           },
           (err) => console.warn('Firestore device sessions listener error', err)
         );
+        unsubs.push(firestoreUnsub);
       } catch (e) {
         console.warn('Firestore device sessions listener error', e);
       }
     }
-    return () => {};
+
+    return () => {
+      unsubs.forEach(u => u());
+    };
   }
 }

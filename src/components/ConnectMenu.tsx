@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Cast, 
   Laptop, 
@@ -10,70 +10,36 @@ import {
   Users, 
   Volume2, 
   Radio, 
-  ShieldCheck
+  ShieldCheck,
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
-import { useAuth } from '../context/AuthContext';
 import { DeviceSession, DeviceType } from '../types';
-import { DatabaseService } from '../services/firebase';
 import { ConnectSyncService } from '../services/connectSync';
 
 export const ConnectMenu: React.FC = () => {
-  const { isConnectOpen, setIsConnectOpen, volume, setVolume, isPlaying } = useAudio();
-  const { currentUser } = useAuth();
-  const [sessions, setSessions] = useState<DeviceSession[]>([]);
-  const [listenTogether, setListenTogether] = useState<boolean>(true);
+  const { 
+    isConnectOpen, 
+    setIsConnectOpen, 
+    volume, 
+    setVolume, 
+    isPlaying,
+    currentTrack,
+    remoteActiveDevice,
+    connectedDevices,
+    transferPlaybackToDevice,
+    sendRemoteCommand,
+    takeOverPlaybackHere
+  } = useAudio();
+
+  const [listenTogether, setListenTogether] = useState<boolean>(false);
   const currentDeviceId = ConnectSyncService.getOrCreateDeviceId();
-
-  useEffect(() => {
-    if (!isConnectOpen) return;
-
-    const currentDevice: DeviceSession = {
-      id: currentDeviceId,
-      userId: currentUser?.id ?? '',
-      name: ConnectSyncService.getDeviceName(),
-      deviceType: ConnectSyncService.getDeviceType(),
-      isCurrentDevice: true,
-      isActivePlayback: isPlaying,
-      progressSeconds: 0,
-      isPlaying,
-      volume,
-      lastUpdated: Date.now()
-    };
-
-    setSessions([currentDevice]);
-
-    // Broadcast channel for cross-tab local discovery
-    const channel = new BroadcastChannel('gaana_device_presence');
-    channel.postMessage({ type: 'presence', device: currentDevice });
-
-    channel.onmessage = (event) => {
-      if (event.data?.type === 'presence' && event.data.device) {
-        const remoteDevice = event.data.device as DeviceSession;
-        if (remoteDevice.id !== currentDeviceId) {
-          setSessions(prev => {
-            const filtered = prev.filter(d => d.id !== remoteDevice.id);
-            return [...filtered, { ...remoteDevice, isCurrentDevice: false }];
-          });
-        }
-      }
-    };
-
-    const unsubscribe = DatabaseService.subscribeDeviceSessions(currentUser?.id, (fetched) => {
-      if (fetched.length > 0) {
-        setSessions(prev => {
-          const current = prev.find(p => p.id === currentDeviceId) || currentDevice;
-          const others = fetched.filter(f => f.id !== currentDeviceId).map(f => ({ ...f, isCurrentDevice: false }));
-          return [current, ...others];
-        });
-      }
-    });
-
-    return () => {
-      channel.close();
-      unsubscribe();
-    };
-  }, [isConnectOpen, currentDeviceId, isPlaying, volume, currentUser?.id]);
+  const currentDeviceName = ConnectSyncService.getDeviceName();
+  const currentDeviceType = ConnectSyncService.getDeviceType();
 
   if (!isConnectOpen) return null;
 
@@ -86,13 +52,8 @@ export const ConnectMenu: React.FC = () => {
     }
   };
 
-  const handleSelectDevice = (device: DeviceSession) => {
-    setSessions(prev => prev.map(s => ({
-      ...s,
-      isCurrentDevice: s.id === device.id,
-      isActivePlayback: s.id === device.id
-    })));
-  };
+  const isCurrentDevicePlaying = isPlaying && !remoteActiveDevice;
+  const otherDevices = connectedDevices.filter(d => d.id !== currentDeviceId && d.id !== remoteActiveDevice?.id);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
@@ -114,122 +75,199 @@ export const ConnectMenu: React.FC = () => {
 
           <button
             onClick={() => setIsConnectOpen(false)}
-            className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all"
+            className="p-2 rounded-full bg-white/5 text-on-surface-variant hover:text-white transition-all cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Listen Together Room Sync Toggle */}
-        <div className="p-4 rounded-lg bg-surface-container border border-white/10 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded bg-tertiary/20 text-tertiary border border-tertiary/30">
-              <Users size={18} />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-white">Listen Together</h4>
-              <p className="text-xs text-on-surface-variant">Sync queue in real-time with friends</p>
-            </div>
-          </div>
+        {/* Remote Active Device (If playing on another place/device) */}
+        {remoteActiveDevice && (
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-green-400 flex items-center gap-1.5">
+              <Radio size={12} className="animate-pulse" />
+              Active on another device
+            </span>
 
-          <button
-            onClick={() => setListenTogether(!listenTogether)}
-            className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-              listenTogether ? 'bg-primary' : 'bg-white/20'
-            }`}
-          >
-            <div
-              className={`w-5 h-5 rounded-full bg-background shadow-md transition-transform ${
-                listenTogether ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Current Active Device Card */}
-        <div className="space-y-3">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Current Device</span>
-          
-          {sessions.filter(s => s.isCurrentDevice).map((device) => {
-            const Icon = getDeviceIcon(device.deviceType);
-            return (
-              <div
-                key={device.id}
-                className="p-4 rounded-lg bg-primary/10 border border-white/20 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="p-3 rounded bg-primary text-on-primary shadow-lg ">
-                    <Icon size={20} />
-                  </div>
+            <div className="p-4 rounded-xl bg-gradient-to-r from-primary/20 via-surface-container to-surface-container border border-primary/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {React.createElement(getDeviceIcon(remoteActiveDevice.deviceType), {
+                    size: 24,
+                    className: 'text-primary'
+                  })}
                   <div>
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      {device.name}
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
-                    </h4>
-                    <p className="text-xs text-primary font-medium flex items-center gap-1 mt-0.5">
-                      <Radio size={11} /> Playing on this device
-                    </p>
+                    <h4 className="text-sm font-bold text-white">{remoteActiveDevice.name}</h4>
+                    <p className="text-xs text-primary font-medium">Listening on this device</p>
                   </div>
                 </div>
 
+                <button
+                  onClick={takeOverPlaybackHere}
+                  className="px-3.5 py-1.5 rounded-full bg-primary hover:bg-primary-fixed text-on-primary font-bold text-xs flex items-center gap-1.5 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                >
+                  <ArrowRightLeft size={13} />
+                  <span>Play here</span>
+                </button>
+              </div>
+
+              {/* Remote Control Bar */}
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <Volume2 size={16} className="text-primary" />
+                  <button
+                    onClick={() => sendRemoteCommand({ type: 'prev' })}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-white transition-colors cursor-pointer"
+                    title="Previous on remote device"
+                  >
+                    <SkipBack size={16} fill="currentColor" />
+                  </button>
+
+                  <button
+                    onClick={() => sendRemoteCommand({ type: remoteActiveDevice.isPlaying ? 'pause' : 'play' })}
+                    className="p-2 rounded-full bg-white text-black hover:bg-white/90 shadow transition-all cursor-pointer"
+                    title={remoteActiveDevice.isPlaying ? 'Pause remote device' : 'Resume remote device'}
+                  >
+                    {remoteActiveDevice.isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
+                  </button>
+
+                  <button
+                    onClick={() => sendRemoteCommand({ type: 'next' })}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-white transition-colors cursor-pointer"
+                    title="Next on remote device"
+                  >
+                    <SkipForward size={16} fill="currentColor" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Volume2 size={15} className="text-on-surface-variant" />
                   <input
                     type="range"
                     min="0"
                     max="1"
-                    step="0.01"
-                    value={volume}
-                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    step="0.05"
+                    defaultValue={remoteActiveDevice.volume}
+                    onChange={(e) => sendRemoteCommand({ type: 'volume', volume: parseFloat(e.target.value) })}
                     className="w-20 h-1 bg-white/20 rounded-lg cursor-pointer accent-primary"
                   />
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        )}
 
-        {/* Available Devices List */}
-        <div className="space-y-3">
+        {/* Current Device Card */}
+        <div className="space-y-2">
           <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-            Available Devices
+            This Device
           </span>
 
-          <div className="space-y-2">
-            {sessions.filter(s => !s.isCurrentDevice).map((device) => {
-              const Icon = getDeviceIcon(device.deviceType);
-              return (
-                <button
-                  key={device.id}
-                  onClick={() => handleSelectDevice(device)}
-                  className="w-full p-3.5 rounded-lg bg-surface-container hover:border-white/20 hover:bg-white/5 flex items-center justify-between text-left transition-all group"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className="p-2.5 rounded bg-white/5 text-on-surface-variant group-hover:text-primary transition-colors">
-                      <Icon size={18} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-white group-hover:text-primary transition-colors">
-                        {device.name}
-                      </h4>
-                      <p className="text-xs text-on-surface-variant capitalize">{device.deviceType} • Online</p>
-                    </div>
-                  </div>
+          <div className={`p-4 rounded-xl border transition-all flex items-center justify-between ${
+            isCurrentDevicePlaying 
+              ? 'bg-primary/10 border-primary/40' 
+              : 'bg-surface-container border-white/10'
+          }`}>
+            <div className="flex items-center gap-3.5">
+              <div className={`p-3 rounded-lg ${isCurrentDevicePlaying ? 'bg-primary text-on-primary shadow-lg' : 'bg-white/5 text-on-surface-variant'}`}>
+                {React.createElement(getDeviceIcon(currentDeviceType), { size: 20 })}
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  {currentDeviceName}
+                  {isCurrentDevicePlaying && (
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
+                  )}
+                </h4>
+                <p className={`text-xs font-medium mt-0.5 ${isCurrentDevicePlaying ? 'text-primary' : 'text-on-surface-variant'}`}>
+                  {isCurrentDevicePlaying ? 'Playing on this device' : 'Ready to play'}
+                </p>
+              </div>
+            </div>
 
-                  <span className="text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    Switch
-                  </span>
-                </button>
-              );
-            })}
+            {isCurrentDevicePlaying ? (
+              <div className="flex items-center gap-2">
+                <Volume2 size={16} className="text-primary" />
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="w-20 h-1 bg-white/20 rounded-lg cursor-pointer accent-primary"
+                />
+              </div>
+            ) : (
+              <button
+                onClick={takeOverPlaybackHere}
+                className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Play here
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Other Available Devices List */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+              Available Devices ({otherDevices.length})
+            </span>
+            <span className="text-[10px] text-on-surface-variant">
+              Logged in on same account
+            </span>
+          </div>
+
+          {otherDevices.length === 0 ? (
+            <div className="p-5 text-center rounded-lg bg-white/5 border border-white/5 space-y-1.5">
+              <p className="text-xs text-white font-semibold">No other active devices detected</p>
+              <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                Log in to Gaana-Bajao on another browser, phone, or laptop with this account.
+                It will automatically appear here for remote playback and handoff.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {otherDevices.map((device) => {
+                const Icon = getDeviceIcon(device.deviceType);
+                return (
+                  <button
+                    key={device.id}
+                    onClick={() => transferPlaybackToDevice(device.id)}
+                    className="w-full p-3.5 rounded-xl bg-surface-container hover:border-primary/40 hover:bg-white/5 border border-white/5 flex items-center justify-between text-left transition-all group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="p-2.5 rounded-lg bg-white/5 text-on-surface-variant group-hover:text-primary transition-colors">
+                        <Icon size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-white group-hover:text-primary transition-colors">
+                          {device.name}
+                        </h4>
+                        <p className="text-xs text-on-surface-variant capitalize">
+                          {device.deviceType} • Online
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ArrowRightLeft size={13} />
+                      <span>Switch</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Footer info */}
         <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-on-surface-variant font-medium">
-          <span className="flex items-center gap-1 text-green-400">
-            <ShieldCheck size={13} /> Synchronized Playback
+          <span className="flex items-center gap-1.5 text-green-400">
+            <ShieldCheck size={14} /> Synchronized Playback
           </span>
+          <span className="text-[10px]">Amazon Music & Spotify Protocol</span>
         </div>
       </div>
     </div>

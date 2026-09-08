@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Heart } from 'lucide-react';
+import { Play, Pause, Heart, Radio } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { CoverArt } from './CoverArt';
@@ -7,14 +7,6 @@ import { getCoverTint } from '../utils/coverArt';
 
 /**
  * The docked player from the mobile comp.
- *
- * Figma: a 410x59 card inset 6px from each edge, tinted from the artwork, with
- * 37px art, the track title, the connected device underneath, a play control,
- * and the progress rail along the card's bottom edge.
- *
- * The desktop player bar is a different object entirely — 112px with full
- * transport and volume — so this is a separate component rather than a pile of
- * responsive overrides on that one.
  */
 export const MobileMiniPlayer: React.FC = () => {
   const {
@@ -24,7 +16,8 @@ export const MobileMiniPlayer: React.FC = () => {
     duration,
     togglePlay,
     setIsNowPlayingOpen,
-    logInteraction
+    logInteraction,
+    remoteActiveDevice
   } = useAudio();
 
   const { currentUser, toggleLikeTrack } = useAuth();
@@ -58,11 +51,14 @@ export const MobileMiniPlayer: React.FC = () => {
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-white truncate">{currentTrack.title}</p>
-          {/* The comp shows the connected Bluetooth device here. This app has
-              a Connect feature, but the audio context does not expose which
-              device is active, so the line carries the artist instead of a
-              made-up device name. */}
-          <p className="text-2xs text-white/70 truncate">{currentTrack.artist}</p>
+          {remoteActiveDevice ? (
+            <p className="text-2xs text-green-400 font-semibold truncate flex items-center gap-1">
+              <Radio size={10} className="animate-pulse flex-shrink-0" />
+              <span>Playing on {remoteActiveDevice.name}</span>
+            </p>
+          ) : (
+            <p className="text-2xs text-white/70 truncate">{currentTrack.artist}</p>
+          )}
         </div>
 
         <button

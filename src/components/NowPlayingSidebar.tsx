@@ -163,7 +163,7 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
                 </h4>
                 <p className="text-sm text-on-surface-variant flex items-center gap-1.5 mt-1">
                   <Users size={14} />
-                  <span>{artist.monthlyListeners.toLocaleString()} monthly listeners</span>
+                  <span>{(artist.monthlyListeners || 0).toLocaleString()} monthly listeners</span>
                 </p>
               </div>
 

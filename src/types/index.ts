@@ -134,6 +134,18 @@ export interface TelemetryEvent {
   };
 }
 
+export type RemoteCommandType = 'play' | 'pause' | 'seek' | 'transfer' | 'next' | 'prev' | 'volume';
+
+export interface RemoteCommand {
+  type: RemoteCommandType;
+  trackId?: string;
+  progressSeconds?: number;
+  volume?: number;
+  queueTrackIds?: string[];
+  issuedAt: number;
+  issuedByDeviceId: string;
+}
+
 export interface DeviceSession {
   id: string;
   /**
@@ -154,6 +166,7 @@ export interface DeviceSession {
   isPlaying: boolean;
   volume: number;
   lastUpdated: number;
+  pendingCommand?: RemoteCommand | null;
 }
 
 export interface Shelf {

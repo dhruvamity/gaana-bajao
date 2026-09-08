@@ -56,9 +56,10 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
     setIsNowPlayingOpen,
     setIsQueueOpen,
     setIsConnectOpen,
-    logInteraction
-  ,
-    playbackError
+    logInteraction,
+    playbackError,
+    remoteActiveDevice,
+    takeOverPlaybackHere
   } = useAudio();
 
   const { currentUser, toggleLikeTrack } = useAuth();
@@ -130,18 +131,33 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               <span className="truncate" title={playbackError}>{playbackError}</span>
             </p>
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (currentTrack.artistId && onSelectArtist) {
-                onSelectArtist(currentTrack.artistId);
-              }
-            }}
-            className="block max-w-full text-sm text-on-surface-variant hover:text-white hover:underline transition-colors truncate text-left"
-          >
-            {currentTrack.artist}
-          </button>
+          {remoteActiveDevice ? (
+            <div className="flex items-center gap-1.5 text-2xs text-green-400 font-semibold mt-0.5">
+              <Radio size={11} className="animate-pulse flex-shrink-0" />
+              <span className="truncate max-w-[120px]" title={remoteActiveDevice.name}>Playing on {remoteActiveDevice.name}</span>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={takeOverPlaybackHere}
+                className="text-primary hover:underline font-bold"
+              >
+                Play here
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (currentTrack.artistId && onSelectArtist) {
+                  onSelectArtist(currentTrack.artistId);
+                }
+              }}
+              className="block max-w-full text-xs text-on-surface-variant hover:text-white hover:underline transition-colors truncate text-left"
+            >
+              {currentTrack.artist}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
@@ -281,11 +297,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
         <button
           onClick={() => setIsConnectOpen(true)}
-          className="p-2 rounded text-on-surface-variant hover:text-white transition-colors"
-          title="Connect to a device"
-          aria-label="Connect to a device"
+          className={`p-2 rounded transition-colors relative cursor-pointer ${
+            remoteActiveDevice ? 'text-green-400 hover:text-green-300' : 'text-on-surface-variant hover:text-white'
+          }`}
+          title={remoteActiveDevice ? `Listening on ${remoteActiveDevice.name}` : "Connect to a device"}
+          aria-label={remoteActiveDevice ? `Listening on ${remoteActiveDevice.name}` : "Connect to a device"}
         >
-          <Cast size={20} />
+          <Cast size={20} className={remoteActiveDevice ? 'animate-pulse' : ''} />
+          {remoteActiveDevice && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-400"></span>
+          )}
         </button>
 
         {/* Volume Controls */}

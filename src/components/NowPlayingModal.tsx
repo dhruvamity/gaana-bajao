@@ -58,7 +58,8 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
     setIsNowPlayingOpen,
     setIsQueueOpen,
     setIsConnectOpen,
-    logInteraction
+    logInteraction,
+    remoteActiveDevice
   } = useAudio();
 
   const { currentUser, toggleLikeTrack } = useAuth();
@@ -350,10 +351,12 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           {/* Connect Devices */}
           <button
             onClick={() => setIsConnectOpen(true)}
-            className="flex items-center gap-2 text-xs font-semibold text-primary hover:text-white transition-colors"
+            className={`flex items-center gap-2 text-xs font-semibold transition-colors cursor-pointer ${
+              remoteActiveDevice ? 'text-green-400 hover:text-green-300' : 'text-primary hover:text-white'
+            }`}
           >
-            <Cast size={18} />
-            <span>Connect & Handoff</span>
+            <Cast size={18} className={remoteActiveDevice ? 'animate-pulse' : ''} />
+            <span>{remoteActiveDevice ? `Listening on ${remoteActiveDevice.name}` : 'Connect & Handoff'}</span>
           </button>
 
           {/* Up Next Queue */}

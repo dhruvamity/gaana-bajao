@@ -39,6 +39,7 @@ export const QueueDrawer: React.FC = () => {
   const upNextTracks = queue.filter((_, idx) => idx > currentIndex);
 
   const formatDuration = (secs: number) => {
+    if (!secs || isNaN(secs)) return '0:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
