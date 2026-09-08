@@ -39,14 +39,21 @@ service cloud.firestore {
     // Shared catalogue. Any signed-in user may read; only the uploader writes.
     match /tracks/{trackId} {
       function validTrack(data) {
-        return data.title is string
+        return data.keys().hasOnly([
+                 'id', 'title', 'artist', 'artistId', 'ownerId', 'ownerName',
+                 'album', 'duration', 'audioUrl', 'coverUrl', 'genre', 'tags',
+                 'acoustics', 'createdAt', 'playCount', 'saveCount', 'skipCount',
+                 'earlyVelocity', 'frictionScore', 'recommendationReason'
+               ])
+            && data.title is string
             && data.title.size() > 0
             && data.title.size() <= 300
             && data.artist is string
             && data.artist.size() <= 300
             && data.audioUrl is string
-            && data.audioUrl.matches('https://.*')
-            && data.ownerId is string;
+            && data.audioUrl.matches('https://res\\.cloudinary\\.com/.*')
+            && data.ownerId is string
+            && data.duration is number;
       }
 
       allow read: if isSignedIn();
@@ -81,13 +88,20 @@ service cloud.firestore {
             && data.ownerId is string;
       }
 
+      // Collaborators may only modify trackIds and updatedAt — not title,
+      // description, visibility, coverUrl, or collaborator membership.
+      function collaboratorAllowedFields() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['trackIds', 'updatedAt']);
+      }
+
       allow read: if isSignedIn();
       allow create: if ownsNew() && validPlaylist(request.resource.data);
       allow update: if validPlaylist(request.resource.data)
                     && ownerUnchanged()
                     && (
                          ownsExisting()
-                         || (isCollaborator() && collaboratorsUnchanged())
+                         || (isCollaborator() && collaboratorsUnchanged() && collaboratorAllowedFields())
                        );
       allow delete: if ownsExisting();
     }

@@ -127,7 +127,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         fallbackTitle = parts.slice(1).join(' - ').trim();
       }
 
-      const tempId = `queue_${Date.now()}_${i}`;
+      const tempId = `queue_${crypto.randomUUID()}`;
       newItems.push({
         id: tempId,
         file,
@@ -245,7 +245,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       // 1. Upload global cover art to Cloudinary (if manually provided)
       let globalCoverUrl = '';
       if (coverFile) {
-        globalCoverUrl = await StorageService.saveImageBlob(`cover_batch_${Date.now()}`, coverFile);
+        globalCoverUrl = await StorageService.saveImageBlob(`cover_batch_${crypto.randomUUID()}`, coverFile);
       }
 
       const uploadedTracks: Track[] = [];
@@ -257,7 +257,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'uploading' } : q));
 
-        const trackId = `track_${Date.now()}_${i}`;
+        const trackId = `track_${crypto.randomUUID()}`;
 
         // Upload audio to Cloudinary
         const finalAudioUrl = await StorageService.saveAudioBlob(trackId, item.file);
@@ -324,7 +324,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         const playlistCover = globalCoverUrl || uploadedTracks[0]?.coverUrl || '';
 
         const newPlaylist: Playlist = {
-          id: `pl_${Date.now()}`,
+          id: `pl_${crypto.randomUUID()}`,
           title: newPlaylistTitle.trim(),
           description: newPlaylistDescription.trim() || `Collection of ${uploadedTracks.length} tracks`,
           coverUrl: playlistCover,

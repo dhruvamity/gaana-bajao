@@ -153,6 +153,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const isShuffleRef = useRef<boolean>(isShuffle);
   isShuffleRef.current = isShuffle;
 
+  // Fisher-Yates shuffle support: pre-computed walk order and original queue backup
+  const shuffledIndicesRef = useRef<number[]>([]);
+  const shufflePositionRef = useRef<number>(0);
+  const originalQueueRef = useRef<Track[]>([]);
+
   const durationRef = useRef<number>(duration);
   durationRef.current = duration;
 
@@ -309,6 +314,81 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => window.clearTimeout(id);
   }, [volume, broadcastNow]);
 
+  // ── MediaSession API ──────────────────────────────────────────────────
+  // Provides lock-screen / notification-area transport controls on mobile
+  // and hardware media-key support on desktop. Action handlers read from
+  // refs so they always observe current state without re-binding.
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    const ms = navigator.mediaSession;
+
+    // Transport controls via refs — never stale
+    ms.setActionHandler('play', () => {
+      audioEngineRef.current?.play().catch(() => {});
+      setIsPlaying(true);
+    });
+    ms.setActionHandler('pause', () => {
+      audioEngineRef.current?.pause();
+    });
+    ms.setActionHandler('previoustrack', () => {
+      const p = progressRef.current;
+      if (p > 3) {
+        audioEngineRef.current?.seek(0);
+        setProgress(0);
+      } else {
+        const q = queueRef.current;
+        const cur = currentTrackRef.current;
+        if (q.length === 0) return;
+        const idx = q.findIndex(t => t.id === cur?.id);
+        const prev = idx > 0 ? idx - 1 : q.length - 1;
+        startTrack(q[prev]);
+      }
+    });
+    ms.setActionHandler('nexttrack', () => {
+      advance({ userInitiated: true });
+    });
+    ms.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null && audioEngineRef.current) {
+        audioEngineRef.current.seek(details.seekTime);
+        setProgress(details.seekTime);
+      }
+    });
+
+    return () => {
+      ms.setActionHandler('play', null);
+      ms.setActionHandler('pause', null);
+      ms.setActionHandler('previoustrack', null);
+      ms.setActionHandler('nexttrack', null);
+      ms.setActionHandler('seekto', null);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — handlers use refs
+
+  // Update MediaSession metadata whenever the current track changes
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    if (!currentTrack) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+    const artwork: MediaImage[] = [];
+    if (currentTrack.coverUrl) {
+      artwork.push({ src: currentTrack.coverUrl, sizes: '512x512', type: 'image/jpeg' });
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.title,
+      artist: currentTrack.artist,
+      album: currentTrack.album || '',
+      artwork
+    });
+  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.coverUrl]);
+
+  // Sync MediaSession playback state
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
+
   const logInteractionInternal = useCallback(async (
     action: InteractionType,
     trackId?: string,
@@ -449,9 +529,21 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (curQueue.length === 0) return;
     const currentIndex = curQueue.findIndex(t => t.id === track?.id);
 
-    let nextIndex = currentIndex + 1;
-    if (isShuffleRef.current) {
-      nextIndex = Math.floor(Math.random() * curQueue.length);
+    let nextIndex: number;
+    if (isShuffleRef.current && shuffledIndicesRef.current.length > 0) {
+      // Walk through the pre-shuffled index sequence
+      shufflePositionRef.current += 1;
+      if (shufflePositionRef.current >= shuffledIndicesRef.current.length) {
+        if (isRepeatRef.current) {
+          shufflePositionRef.current = 0;
+        } else {
+          setIsPlaying(false);
+          return;
+        }
+      }
+      nextIndex = shuffledIndicesRef.current[shufflePositionRef.current];
+    } else {
+      nextIndex = currentIndex + 1;
     }
 
     if (nextIndex < curQueue.length) {
@@ -490,7 +582,40 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const toggleShuffle = () => setIsShuffle(prev => !prev);
+  /**
+   * Generate a Fisher-Yates shuffled index array, pinning the current track
+   * at position 0 so the user never hears the same song twice consecutively.
+   */
+  const generateShuffledIndices = (length: number, currentIndex: number): number[] => {
+    const indices = Array.from({ length }, (_, i) => i).filter(i => i !== currentIndex);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    return currentIndex >= 0 ? [currentIndex, ...indices] : indices;
+  };
+
+  const toggleShuffle = () => {
+    setIsShuffle(prev => {
+      const next = !prev;
+      if (next) {
+        // Entering shuffle: backup original order, generate walk
+        originalQueueRef.current = [...queueRef.current];
+        const currentIndex = queueRef.current.findIndex(t => t.id === currentTrackRef.current?.id);
+        shuffledIndicesRef.current = generateShuffledIndices(queueRef.current.length, currentIndex);
+        shufflePositionRef.current = 0;
+      } else {
+        // Leaving shuffle: restore original order
+        if (originalQueueRef.current.length > 0) {
+          setQueue(originalQueueRef.current);
+        }
+        shuffledIndicesRef.current = [];
+        shufflePositionRef.current = 0;
+        originalQueueRef.current = [];
+      }
+      return next;
+    });
+  };
   const toggleRepeat = () => setIsRepeat(prev => !prev);
 
   const addToQueue = (track: Track) => {

@@ -12,6 +12,8 @@ export class AudioEngine {
   private isContextInitialized = false;
   private isDestroyed = false;
   private currentRawUrl: string = '';
+  /** Tracks the in-flight play() promise so rapid skips don't leave dangling promises. */
+  private playPromise: Promise<void> | null = null;
 
   // Bound listener references, kept so destroy() can detach them
   private readonly listeners: { [K in keyof HTMLMediaElementEventMap]?: EventListener } = {};
@@ -295,10 +297,17 @@ export class AudioEngine {
 
   public async play(): Promise<void> {
     if (this.isDestroyed) return;
+    // Await any in-flight play() to prevent overlapping promises. The previous
+    // play() may reject with AbortError when we change sources rapidly — that
+    // is expected and safe to suppress.
+    if (this.playPromise) {
+      try { await this.playPromise; } catch { /* AbortError from rapid skip */ }
+    }
     if (this.audioContext && this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
-    return this.audio.play();
+    this.playPromise = this.audio.play();
+    return this.playPromise;
   }
 
   public pause(): void {

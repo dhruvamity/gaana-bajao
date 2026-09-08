@@ -2,12 +2,20 @@ export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
 export type ActivityContext = 'focus' | 'workout' | 'chill' | 'commute' | 'party';
 export type DeviceType = 'desktop' | 'mobile' | 'speaker' | 'tablet';
 
+/**
+ * Heuristic acoustic features derived from RMS/peak analysis during upload.
+ *
+ * These are NOT genuine music-intelligence measurements. Tempo is estimated
+ * from energy (not beat-tracked), valence is a peak/RMS proxy (not a
+ * perceptual model), and danceability is a linear combination of the other
+ * two. Treat them as rough sorting signals, not ground truth.
+ */
 export interface AcousticAttributes {
-  tempo: number; // BPM: 60-180
-  energy: number; // 0.0 - 1.0
-  valence: number; // 0.0 - 1.0 (mood: sad/dark to happy/bright)
-  danceability: number; // 0.0 - 1.0
-  acousticness: number; // 0.0 - 1.0
+  tempo: number; // Estimated BPM (formula: 85 + energy * 55) — not beat-tracked
+  energy: number; // 0.0 - 1.0 — RMS-derived loudness proxy
+  valence: number; // 0.0 - 1.0 — peak/RMS mood proxy, not a perceptual model
+  danceability: number; // 0.0 - 1.0 — linear blend of energy + valence
+  acousticness: number; // 0.0 - 1.0 — inverse of energy, not spectral analysis
   key?: string;
 }
 

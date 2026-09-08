@@ -19,8 +19,9 @@ formality.
 
 ## 1. The stack
 
-Deliberately small. There is no router, no state library, no component library and no server
-of the project's own — each of those jobs is done by something below, or by a React context.
+The dependency surface is deliberately small. **React Router v7** handles URL-based navigation;
+there is no state library, no component library, and no server of the project's own — each of
+those jobs is done by something below, or by a React context.
 
 ### Application
 - **React 18.3** + **TypeScript 5.6**, built by **Vite 6.1**
@@ -35,13 +36,12 @@ of the project's own — each of those jobs is done by something below, or by a 
 
 ### Audio & metadata
 - Playback is a plain `HTMLAudioElement` (see §3 for why)
-- `jsmediatags` + `music-metadata` read tags from local files
+- `jsmediatags` reads tags from local files
 - A hand-rolled ID3v2 parser reads tags from files *already in the cloud*, over HTTP Range
 
 ### Deliberately absent
 | Not used | Replaced by |
 |---|---|
-| React Router | A view string + history stack in `App.tsx` |
 | Redux / Zustand | Two React contexts |
 | Component library | Tailwind tokens + local components |
 | Any server | Firestore security rules |
@@ -231,10 +231,9 @@ artwork. Tapping it opens the full-screen player: large artwork, remaining time 
   announced values. Focus is visible globally. Pinch-zoom is no longer blocked
   (WCAG 1.4.4). Motion respects `prefers-reduced-motion`.
 
-> ⚠️ **The sharpest usability gap is the missing router.** Views are a string in `App.tsx`, so
-> nothing is linkable, the browser's own back button leaves the app rather than going back a
-> view, and a refresh always returns you to Home. The in-app back arrow works because
-> navigation keeps its own stack — but that stack is lost on reload.
+> ✅ **Routing is now handled by React Router v7** (`react-router-dom`). Views are URL-based,
+> the browser's back button works, and links are shareable. The in-app navigation and the
+> browser's native history are synchronised.
 
 ---
 
@@ -264,7 +263,6 @@ Roughly two dozen high/medium findings, none critical:
 - Bundle splitting — 872 kB in one chunk
 - No error boundaries
 - No retry on failed Firestore writes
-- The router gap (§5)
 
 ---
 
