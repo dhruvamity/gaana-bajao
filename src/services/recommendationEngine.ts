@@ -141,8 +141,10 @@ export class RecommendationEngine {
     }
 
     // Proximity in 2D acoustic space
-    const energyDiff = Math.abs(track.acoustics.energy - targetEnergy);
-    const valenceDiff = Math.abs(track.acoustics.valence - targetValence);
+    const energy = track.acoustics?.energy ?? 0.6;
+    const valence = track.acoustics?.valence ?? 0.6;
+    const energyDiff = Math.abs(energy - targetEnergy);
+    const valenceDiff = Math.abs(valence - targetValence);
     const acousticMatch = 1 - (energyDiff * 0.6 + valenceDiff * 0.4);
 
     score += acousticMatch * 0.4;
@@ -153,7 +155,7 @@ export class RecommendationEngine {
     }
 
     // Liked tracks boost
-    if (user.likedTrackIds.includes(track.id)) {
+    if (user.likedTrackIds?.includes(track.id)) {
       score += 0.3;
     }
 
@@ -178,7 +180,8 @@ export class RecommendationEngine {
     );
 
     // 1. Jump Back In / Recently Played Shelf
-    const recentTracks = user.recentTrackIds
+    const recentIds = user.recentTrackIds || [];
+    const recentTracks = recentIds
       .map(id => validCatalog.find(t => t.id === id))
       .filter((t): t is Track => Boolean(t));
 
@@ -199,7 +202,7 @@ export class RecommendationEngine {
     }).sort((a, b) => b.velocity - a.velocity);
 
     const boostedTracks = velocityCandidates
-      .filter(c => c.isBoosted || (Date.now() - c.track.createdAt) < 86400000 * 2)
+      .filter(c => c.isBoosted || (Date.now() - (c.track.createdAt || 0)) < 86400000 * 2)
       .map(c => ({
         ...c.track,
         recommendationReason: `🔥 Trending Release`
@@ -220,7 +223,8 @@ export class RecommendationEngine {
     const contextualScored = validCatalog.map(track => {
       const baseAffinity = this.scoreAcousticAffinity(track, user, context.activity, context.timeOfDay);
       const compositeScore = this.computeCompositeScore(track, events, user.id);
-      const fatigue = this.computeFatigueMultiplier(track.playCount > 10 && !user.likedTrackIds.includes(track.id) ? 3 : 0);
+      const playCount = track.playCount || 0;
+      const fatigue = this.computeFatigueMultiplier(playCount > 10 && !user.likedTrackIds?.includes(track.id) ? 3 : 0);
       
       let finalScore = (baseAffinity * 0.6 + (compositeScore / 500) * 0.4) * fatigue;
 
@@ -252,7 +256,7 @@ export class RecommendationEngine {
     });
 
     // 4. Made For You Shelf
-    const userGenres = user.selectedGenres.length > 0 ? user.selectedGenres : ['Electronic', 'Synthwave', 'Lo-Fi'];
+    const userGenres = (user.selectedGenres && user.selectedGenres.length > 0) ? user.selectedGenres : ['Electronic', 'Synthwave', 'Lo-Fi'];
     const genreTracks = validCatalog
       .filter(t => userGenres.includes(t.genre))
       .map(t => ({
@@ -262,7 +266,7 @@ export class RecommendationEngine {
 
     shelves.push({
       id: 'shelf-discover',
-      title: 'Made For ' + user.name,
+      title: 'Made For ' + (user.name || 'You'),
       subtitle: `Curated based on your taste profile: ${userGenres.join(', ')}`,
       tracks: (genreTracks.length > 0 ? genreTracks : validCatalog).slice(0, 6),
       type: 'discover'

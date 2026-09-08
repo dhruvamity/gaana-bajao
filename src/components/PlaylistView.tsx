@@ -169,12 +169,13 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   };
 
   const formatDuration = (secs: number) => {
+    if (!secs || isNaN(secs)) return '0:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const totalDurationSeconds = tracks.reduce((acc, t) => acc + t.duration, 0);
+  const totalDurationSeconds = tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
   const totalMinutes = Math.floor(totalDurationSeconds / 60);
 
   const handleShare = () => {

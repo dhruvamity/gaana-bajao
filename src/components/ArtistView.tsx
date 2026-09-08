@@ -12,7 +12,8 @@ import {
   ChevronLeft,
   Clock,
   Activity,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { Artist, Track } from '../types';
 import { DatabaseService, onTracksChanged } from '../services/firebase';
@@ -145,6 +146,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
   };
 
   const formatDuration = (secs: number) => {
+    if (!secs || isNaN(secs)) return '0:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
@@ -180,9 +182,9 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             </h1>
             <p className="text-xs sm:text-sm text-on-surface-variant flex items-center gap-2">
               <Users size={14} />
-              <span>{artist.monthlyListeners.toLocaleString()} monthly listeners</span>
+              <span>{(artist.monthlyListeners || 0).toLocaleString()} monthly listeners</span>
               <span>•</span>
-              <span className="text-primary font-medium">{artist.genres.join(', ')}</span>
+              <span className="text-primary font-medium">{(artist.genres || []).join(', ')}</span>
             </p>
           </div>
 
@@ -263,12 +265,30 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
                 </div>
 
                 <div className="hidden sm:flex items-center gap-6 text-xs text-on-surface-variant">
-                  <span>{track.playCount.toLocaleString()} plays</span>
-                  <span className="flex items-center gap-1 text-primary"><Activity size={12} /> {track.acoustics.tempo} BPM</span>
-                  <span className="flex items-center gap-1"><Clock size={12} /> {formatDuration(track.duration)}</span>
+                  <span>{(track.playCount || 0).toLocaleString()} plays</span>
+                  <span className="flex items-center gap-1 text-primary"><Activity size={12} /> {track.acoustics?.tempo ?? 120} BPM</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> {formatDuration(track.duration || 0)}</span>
                 </div>
 
                 <div className="flex items-center gap-1.5 sm:gap-2">
+                  {currentUser && track.ownerId === currentUser.id && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm(`Are you sure you want to delete "${track.title}"? This cannot be undone.`)) {
+                          const success = await DatabaseService.deleteTrack(track.id);
+                          if (success) {
+                            showToast(`Track "${track.title}" deleted.`, 'info');
+                          } else {
+                            showToast('Failed to delete track. Only the owner can delete it.', 'error');
+                          }
+                        }
+                      }}
+                      className="p-2 rounded-full text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete track"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                   {onOpenAddToPlaylist && (
                     <button
                       onClick={() => onOpenAddToPlaylist(track)}
@@ -315,7 +335,7 @@ export const ArtistView: React.FC<ArtistViewProps> = ({
             <span>Genres & Style</span>
           </h3>
           <div className="flex flex-wrap gap-2">
-            {artist.genres.map(genre => (
+            {(artist.genres || []).map(genre => (
               <span key={genre} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-xs font-semibold text-white">
                 {genre}
               </span>

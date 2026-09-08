@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Track, TelemetryEvent, InteractionType } from '../types';
 import { AudioEngine } from '../services/audioEngine';
-import { DatabaseService } from '../services/firebase';
+import { DatabaseService, initRealtimeTracksSync } from '../services/firebase';
 import { RecommendationEngine } from '../services/recommendationEngine';
 import { ConnectSyncService } from '../services/connectSync';
-import { isAudioUrlMissing } from '../services/metadataService';
 import { showToast } from '../components/Toast';
 import { useAuth } from './AuthContext';
 
@@ -123,6 +122,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const playStartTimeRef = useRef<number>(0);
   const hasLogged30sRef = useRef<boolean>(false);
+  const consecutiveErrorsRef = useRef<number>(0);
 
   // Synchronous state refs to prevent stale closure reads in asynchronous media callbacks (Fix 14)
   const currentTrackRef = useRef<Track | null>(currentTrack);
@@ -247,12 +247,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     broadcastNow();
   }, [broadcastNow]);
 
-  // Autonomous background scan on app startup to ensure dead Cloudinary tracks are purged
+  // Real-time tracks sync across browsers and devices
   useEffect(() => {
-    const timer = setTimeout(() => {
-      DatabaseService.autoPruneMissingTracks();
-    }, 1500);
-    return () => clearTimeout(timer);
+    const unsub = initRealtimeTracksSync();
+    return () => unsub();
   }, []);
 
   useEffect(() => {
@@ -343,6 +341,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setQueue(newQueue);
     } else if (!queue.some(t => t.id === track.id)) {
       setQueue([track, ...queue]);
+    }
+
+    if (userInitiated) {
+      consecutiveErrorsRef.current = 0;
+    }
+
+    if (!track.audioUrl || !track.audioUrl.trim()) {
+      setPlaybackError('This track has no audio URL.');
+      setIsPlaying(false);
+      showToast(`Track "${track.title}" has no audio URL.`, 'warning');
+      return;
     }
 
     audioEngineRef.current.setSource(track.audioUrl);
@@ -493,41 +502,45 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         handleTrackEnded();
       },
-      onPlay: () => setIsPlaying(true),
+      onPlay: () => {
+        consecutiveErrorsRef.current = 0;
+        setIsPlaying(true);
+      },
       onPause: () => setIsPlaying(false),
       onError: async (err) => {
         const code = (err as MediaError | null)?.code;
         setIsPlaying(false);
 
         const failedTrack = currentTrackRef.current;
+        const errorMsg = describeMediaError(code);
+        setPlaybackError(errorMsg);
+
+        consecutiveErrorsRef.current += 1;
+
         if (failedTrack) {
-          // Autonomous Auto-Healing: Check if the audio file was deleted from Cloudinary
-          const missing = await isAudioUrlMissing(failedTrack.audioUrl);
-          if (missing || code === 4) {
-            console.warn(`[AutoHeal] Track "${failedTrack.title}" (${failedTrack.id}) audio is deleted from Cloudinary. Auto-purging...`);
-            
-            // 1. Immediately delete from Firestore, localStorage, and playlists
-            await DatabaseService.deleteTrack(failedTrack.id);
-            
-            // 2. Notify user via toast
-            showToast(`Removed "${failedTrack.title}" — audio was deleted from cloud storage.`, 'warning');
-            
-            // 3. Clean up the active queue
-            setQueue(prev => prev.filter(t => t.id !== failedTrack.id));
-            
-            // 4. Advance automatically to the next available track in queue
-            setTimeout(() => {
-              advance({ userInitiated: false });
-            }, 250);
-            return;
-          }
+          console.warn(`[AudioPlayer] Playback error on "${failedTrack.title}" (${failedTrack.id}) [code ${code}]: ${errorMsg}`);
+          showToast(`Cannot play "${failedTrack.title}": ${errorMsg}`, 'warning');
         }
 
-        /* Previously this only warned to the console: the element stopped, but
-           isPlaying stayed true, so the bar kept showing a pause button over a
-           timer frozen at 0:00 and nothing told the listener anything. */
-        setPlaybackError(describeMediaError(code));
-        console.warn('Audio playback error', err);
+        // Loop breaker: if 3 consecutive tracks fail, halt playback to prevent rapid cascading loops
+        if (consecutiveErrorsRef.current >= 3) {
+          console.warn('[AudioPlayer] Consecutive playback failures reached threshold (3). Halting playback.');
+          showToast('Playback stopped: multiple tracks could not be loaded from cloud storage.', 'error');
+          setIsPlaying(false);
+          consecutiveErrorsRef.current = 0;
+          return;
+        }
+
+        // Advance safely to the next track if there are more tracks in queue
+        const curQueue = queueRef.current;
+        if (curQueue.length > 1) {
+          setTimeout(() => {
+            advance({ userInitiated: false });
+          }, 350);
+        } else {
+          setIsPlaying(false);
+          consecutiveErrorsRef.current = 0;
+        }
       }
     };
   });

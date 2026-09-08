@@ -7,7 +7,11 @@ export class StorageService {
   /**
    * Internal helper to upload to Cloudinary using Unsigned Uploads via REST API.
    */
-  private static async uploadToCloudinary(file: Blob | File, resourceType: 'auto' | 'image' | 'video'): Promise<string> {
+  private static async uploadToCloudinary(
+    file: Blob | File,
+    resourceType: 'auto' | 'image' | 'video',
+    preferredFilename?: string
+  ): Promise<string> {
     const cloudName = (import.meta as any).env.VITE_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = (import.meta as any).env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -18,7 +22,8 @@ export class StorageService {
     const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
     
     const formData = new FormData();
-    formData.append('file', file);
+    const filename = preferredFilename || (file instanceof File ? file.name : (resourceType === 'image' ? 'image.jpg' : 'audio.mp3'));
+    formData.append('file', file, filename);
     formData.append('upload_preset', uploadPreset);
 
     const response = await fetch(url, {
@@ -27,8 +32,14 @@ export class StorageService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Cloudinary upload failed: ${errorData.error?.message || response.statusText}`);
+      let errorMsg = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.error?.message || response.statusText;
+      } catch {
+        // fallback
+      }
+      throw new Error(`Cloudinary upload failed: ${errorMsg}`);
     }
 
     const data = await response.json();
@@ -40,8 +51,9 @@ export class StorageService {
    * @returns The secure HTTPS URL of the uploaded audio.
    */
   public static async saveAudioBlob(id: string, blob: Blob | File): Promise<string> {
-    // Cloudinary treats audio files as 'video' resource type
-    return this.uploadToCloudinary(blob, 'video');
+    // Cloudinary treats audio files as 'video' resource type. Provide mp3 extension.
+    const filename = blob instanceof File ? blob.name : `${id}.mp3`;
+    return this.uploadToCloudinary(blob, 'video', filename);
   }
 
   /**
@@ -49,7 +61,8 @@ export class StorageService {
    * @returns The secure HTTPS URL of the uploaded image.
    */
   public static async saveImageBlob(id: string, blob: Blob | File): Promise<string> {
-    return this.uploadToCloudinary(blob, 'image');
+    const filename = blob instanceof File ? blob.name : `${id}.jpg`;
+    return this.uploadToCloudinary(blob, 'image', filename);
   }
 
   /**

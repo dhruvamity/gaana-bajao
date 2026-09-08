@@ -120,20 +120,20 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       results = results.filter(t => 
-        t.title.toLowerCase().includes(q) ||
-        t.artist.toLowerCase().includes(q) ||
-        t.album.toLowerCase().includes(q) ||
-        t.genre.toLowerCase().includes(q) ||
-        (t.tags && t.tags.some(tag => tag.toLowerCase().includes(q)))
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.artist || '').toLowerCase().includes(q) ||
+        (t.album || '').toLowerCase().includes(q) ||
+        (t.genre || '').toLowerCase().includes(q) ||
+        (Array.isArray(t.tags) && t.tags.some(tag => tag.toLowerCase().includes(q)))
       );
     }
 
     if (selectedGenre) {
-      results = results.filter(t => t.genre.toLowerCase() === selectedGenre.toLowerCase());
+      results = results.filter(t => (t.genre || '').toLowerCase() === selectedGenre.toLowerCase());
     }
 
     if (minEnergy > 0) {
-      results = results.filter(t => (t.acoustics?.energy || 0.5) >= minEnergy);
+      results = results.filter(t => (t.acoustics?.energy ?? 0.5) >= minEnergy);
     }
 
     setFilteredTracks(results);
@@ -148,6 +148,7 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
   };
 
   const formatDuration = (secs: number) => {
+    if (!secs || isNaN(secs)) return '0:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
@@ -324,9 +325,9 @@ export const SearchExploreView: React.FC<SearchExploreViewProps> = ({
                   </div>
 
                   <div className="hidden sm:flex items-center gap-4 text-xs text-on-surface-variant">
-                    <span className="bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-full text-[11px] text-white/80">{track.genre}</span>
+                    <span className="bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-full text-[11px] text-white/80">{track.genre || 'Music'}</span>
                     <span className="flex items-center gap-1 text-primary"><Activity size={12} /> {track.acoustics?.tempo || 120} BPM</span>
-                    <span className="flex items-center gap-1"><Clock size={12} /> {formatDuration(track.duration)}</span>
+                    <span className="flex items-center gap-1"><Clock size={12} /> {formatDuration(track.duration || 0)}</span>
                   </div>
 
                   <div className="flex items-center gap-1.5 sm:gap-2">

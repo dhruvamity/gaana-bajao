@@ -100,9 +100,10 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
   };
 
   const filteredPlaylists = playlists.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.ownerName.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = (p.title || '').toLowerCase().includes(q) ||
+      (p.description || '').toLowerCase().includes(q) ||
+      (p.ownerName || '').toLowerCase().includes(q);
 
     if (!matchesSearch) return false;
 

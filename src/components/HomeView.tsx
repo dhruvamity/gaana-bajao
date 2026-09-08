@@ -164,6 +164,41 @@ export const HomeView: React.FC<HomeViewProps> = ({
     if (likedTracks.length > 0) playTrack(likedTracks[0], likedTracks);
   };
 
+  const getTrackMenuActions = (track: Track): CardMenuAction[] => {
+    const isOwner = Boolean(currentUser && track.ownerId === currentUser.id);
+    return [
+      ...(onOpenAddToPlaylist ? [{
+        label: 'Add to Playlist',
+        icon: <FolderPlus size={14} className="text-primary" />,
+        onClick: () => onOpenAddToPlaylist(track)
+      }] : []),
+      {
+        label: 'Share Track',
+        icon: <Share2 size={14} className="text-on-surface-variant" />,
+        onClick: () => {
+          const shareUrl = `${window.location.origin}/track/${track.id}`;
+          navigator.clipboard?.writeText(shareUrl);
+          showToast(`Link to "${track.title}" copied to clipboard!`, 'info');
+        }
+      },
+      ...(isOwner ? [{
+        label: 'Delete Track',
+        icon: <Trash2 size={14} />,
+        danger: true,
+        onClick: async () => {
+          if (window.confirm(`Are you sure you want to delete "${track.title}"? This cannot be undone.`)) {
+            const success = await DatabaseService.deleteTrack(track.id);
+            if (success) {
+              showToast(`Track "${track.title}" deleted.`, 'info');
+            } else {
+              showToast(`Failed to delete track. Only the track owner can delete it.`, 'error');
+            }
+          }
+        }
+      }] : [])
+    ];
+  };
+
   return (
     /* Pulled up under the sticky top bar so the hero wash runs behind it, then
        padded back down so content still starts below the bar. */
@@ -273,6 +308,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     subtitle={track.recommendationReason || track.artist}
                     isPlaying={isTrackPlaying}
                     isCurrent={currentTrack?.id === track.id}
+                    menuActions={getTrackMenuActions(track)}
                     onOpen={() => {
                       if (currentTrack?.id === track.id) togglePlay();
                       else playTrack(track, shelf.tracks);
@@ -364,6 +400,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     subtitle={track.artist}
                     isPlaying={isTrackPlaying}
                     isCurrent={currentTrack?.id === track.id}
+                    menuActions={getTrackMenuActions(track)}
                     onOpen={() => {
                       if (track.artistId) onSelectArtist(track.artistId);
                       else if (currentTrack?.id === track.id) togglePlay();

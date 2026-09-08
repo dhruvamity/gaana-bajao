@@ -71,12 +71,21 @@ export async function isAudioUrlMissing(url: string | undefined | null): Promise
     const res = await fetch(url, {
       method: 'GET',
       headers: { Range: 'bytes=0-0' },
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(4000)
     });
     return res.status === 404 || res.status === 410;
-  } catch (err) {
-    // Cross-origin or network failures do not mean the file is deleted.
-    return false;
+  } catch {
+    try {
+      // Fallback simple probe without custom headers (avoids non-simple CORS preflight issues)
+      const headRes = await fetch(url, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000)
+      });
+      return headRes.status === 404 || headRes.status === 410;
+    } catch {
+      // Cross-origin or network failures do not mean the file is deleted.
+      return false;
+    }
   }
 }
 

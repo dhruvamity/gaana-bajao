@@ -154,7 +154,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           {/* Subtle live acoustic badge */}
           <div className="absolute top-4 left-4 bg-surface-container px-2.5 py-1 rounded-full text-[10px] font-bold text-primary flex items-center gap-1">
             <Activity size={12} />
-            <span>{currentTrack.acoustics.tempo} BPM • {currentTrack.acoustics.key || '44.1kHz'}</span>
+            <span>{currentTrack.acoustics?.tempo ?? 120} BPM • {currentTrack.acoustics?.key || '44.1kHz'}</span>
           </div>
         </div>
 
@@ -196,19 +196,19 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             <div className="grid grid-cols-4 gap-2 w-full px-4 text-center">
               <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Energy</div>
-                <div className="text-sm font-bold text-primary">{Math.round(currentTrack.acoustics.energy * 100)}%</div>
+                <div className="text-sm font-bold text-primary">{Math.round((currentTrack.acoustics?.energy ?? 0.5) * 100)}%</div>
               </div>
               <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Valence</div>
-                <div className="text-sm font-bold text-tertiary">{Math.round(currentTrack.acoustics.valence * 100)}%</div>
+                <div className="text-sm font-bold text-tertiary">{Math.round((currentTrack.acoustics?.valence ?? 0.5) * 100)}%</div>
               </div>
               <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Danceability</div>
-                <div className="text-sm font-bold text-secondary">{Math.round(currentTrack.acoustics.danceability * 100)}%</div>
+                <div className="text-sm font-bold text-secondary">{Math.round((currentTrack.acoustics?.danceability ?? 0.5) * 100)}%</div>
               </div>
               <div className="bg-white/5 p-2 rounded">
                 <div className="text-[10px] text-on-surface-variant">Acoustic</div>
-                <div className="text-sm font-bold text-primary-fixed">{Math.round(currentTrack.acoustics.acousticness * 100)}%</div>
+                <div className="text-sm font-bold text-primary-fixed">{Math.round((currentTrack.acoustics?.acousticness ?? 0.5) * 100)}%</div>
               </div>
             </div>
           )}
@@ -216,9 +216,9 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           {activeTab === 'lyrics' && (
             <div className="flex flex-wrap items-center justify-center gap-1.5 px-4 text-center">
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary border border-white/10">
-                {currentTrack.genre}
+                {currentTrack.genre || 'Music'}
               </span>
-              {currentTrack.tags.map(tag => (
+              {(currentTrack.tags || []).map(tag => (
                 <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-white/5 text-on-surface-variant border border-white/10">
                   #{tag}
                 </span>

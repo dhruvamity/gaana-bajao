@@ -150,15 +150,107 @@ async function withWriteRetry<T>(operation: string, fn: () => Promise<T>, maxRet
 }
 
 /**
+ * Sanitize and guarantee robust schema defaults on any track object.
+ * Prevents any runtime TypeError when rendering missing acoustics, tags, duration, etc.
+ */
+export function sanitizeTrack(raw: any): Track {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid track payload');
+  }
+
+  const rawAcoustics = raw.acoustics || {};
+  const tempo = typeof rawAcoustics.tempo === 'number' && !isNaN(rawAcoustics.tempo) && rawAcoustics.tempo > 0
+    ? Math.round(rawAcoustics.tempo)
+    : 120;
+  const energy = typeof rawAcoustics.energy === 'number' && !isNaN(rawAcoustics.energy)
+    ? Math.max(0, Math.min(1, rawAcoustics.energy))
+    : 0.7;
+  const valence = typeof rawAcoustics.valence === 'number' && !isNaN(rawAcoustics.valence)
+    ? Math.max(0, Math.min(1, rawAcoustics.valence))
+    : 0.5;
+  const danceability = typeof rawAcoustics.danceability === 'number' && !isNaN(rawAcoustics.danceability)
+    ? Math.max(0, Math.min(1, rawAcoustics.danceability))
+    : 0.6;
+  const acousticness = typeof rawAcoustics.acousticness === 'number' && !isNaN(rawAcoustics.acousticness)
+    ? Math.max(0, Math.min(1, rawAcoustics.acousticness))
+    : 0.2;
+
+  const title = typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'Untitled Track';
+  const artist = typeof raw.artist === 'string' && raw.artist.trim() ? raw.artist.trim() : 'Unknown Artist';
+  const artistId = typeof raw.artistId === 'string' && raw.artistId.trim() ? raw.artistId.trim() : slugifyArtistId(artist);
+  const duration = typeof raw.duration === 'number' && !isNaN(raw.duration) && raw.duration > 0 ? Math.round(raw.duration) : 180;
+  const playCount = typeof raw.playCount === 'number' && !isNaN(raw.playCount) ? Math.max(0, raw.playCount) : 0;
+  const saveCount = typeof raw.saveCount === 'number' && !isNaN(raw.saveCount) ? Math.max(0, raw.saveCount) : 0;
+  const skipCount = typeof raw.skipCount === 'number' && !isNaN(raw.skipCount) ? Math.max(0, raw.skipCount) : 0;
+
+  const tags = Array.isArray(raw.tags)
+    ? raw.tags.filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim())
+    : [];
+
+  return {
+    id: String(raw.id || `track_${Date.now()}`),
+    title,
+    artist,
+    artistId,
+    ownerId: typeof raw.ownerId === 'string' ? raw.ownerId : undefined,
+    ownerName: typeof raw.ownerName === 'string' ? raw.ownerName : undefined,
+    album: typeof raw.album === 'string' && raw.album.trim() ? raw.album.trim() : 'Single',
+    duration,
+    audioUrl: typeof raw.audioUrl === 'string' ? raw.audioUrl : '',
+    coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : '',
+    genre: typeof raw.genre === 'string' && raw.genre.trim() ? raw.genre.trim() : 'Music',
+    tags,
+    acoustics: {
+      tempo,
+      energy,
+      valence,
+      danceability,
+      acousticness,
+      key: typeof rawAcoustics.key === 'string' ? rawAcoustics.key : 'Standard'
+    },
+    createdAt: typeof raw.createdAt === 'number' && !isNaN(raw.createdAt) ? raw.createdAt : Date.now(),
+    playCount,
+    saveCount,
+    skipCount,
+    earlyVelocity: typeof raw.earlyVelocity === 'number' ? raw.earlyVelocity : 0,
+    frictionScore: typeof raw.frictionScore === 'number' ? raw.frictionScore : 0,
+    recommendationReason: typeof raw.recommendationReason === 'string' ? raw.recommendationReason : undefined
+  };
+}
+
+/**
+ * Cross-tab and real-time catalogue sync.
+ */
+const _syncBroadcast = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('gaana_catalogue_sync') : null;
+
+if (_syncBroadcast) {
+  _syncBroadcast.onmessage = (e) => {
+    if (e.data?.type === 'tracks_changed' || e.data?.type === 'playlists_changed') {
+      invalidateTracksCache();
+      notifyTracksChanged();
+    }
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEYS.TRACKS || e.key === STORAGE_KEYS.PLAYLISTS) {
+      invalidateTracksCache();
+      notifyTracksChanged();
+    }
+  });
+}
+
+/**
  * Module-level shared cache for getTracks().
  *
- * Every component used to call getTracks() independently, causing 9 full
- * collection reads (891 document reads) on a single cold page load. This
- * cache deduplicates them: concurrent calls share the same in-flight promise,
- * and the result is reused until a write invalidates it.
+ * Every component used to call getTracks() independently, causing redundant reads.
+ * This cache deduplicates them: concurrent calls share the same in-flight promise,
+ * and the result is reused until a write or remote update invalidates it.
  */
 let _tracksCache: Track[] | null = null;
 let _tracksCachePromise: Promise<Track[]> | null = null;
+let _tracksSnapshotUnsubscribe: (() => void) | null = null;
 
 export type TrackChangeListener = () => void;
 const _trackChangeListeners = new Set<TrackChangeListener>();
@@ -187,6 +279,35 @@ export function invalidateTracksCache(): void {
   _tracksCachePromise = null;
 }
 
+/**
+ * Setup real-time Firestore synchronization for the tracks catalogue.
+ * Automatically pulls updates across all connected browsers when authenticated.
+ */
+export function initRealtimeTracksSync(): () => void {
+  if (!db) return () => {};
+  if (_tracksSnapshotUnsubscribe) return _tracksSnapshotUnsubscribe;
+
+  try {
+    _tracksSnapshotUnsubscribe = onSnapshot(
+      collection(db, 'tracks'),
+      (snap) => {
+        const remote = snap.docs.map(d => sanitizeTrack({ id: d.id, ...d.data() }));
+        _tracksCache = remote;
+        localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(remote));
+        notifyTracksChanged();
+      },
+      (err) => {
+        // Can happen if unauthenticated or network drops
+        console.warn('Firestore tracks real-time listener inactive:', err.message);
+      }
+    );
+    return _tracksSnapshotUnsubscribe;
+  } catch (e) {
+    console.warn('Could not initialize real-time tracks sync:', e);
+    return () => {};
+  }
+}
+
 export class DatabaseService {
   private static _isPruning = false;
   /**
@@ -210,25 +331,25 @@ export class DatabaseService {
   }
 
   private static async _fetchTracks(): Promise<Track[]> {
-    let local: Track[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
+    let localRaw: any[] = [];
+    try {
+      localRaw = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
+    } catch {
+      localRaw = [];
+    }
+    const local = localRaw.map(t => sanitizeTrack(t));
 
     if (!db) return local;
 
     try {
       const snap = await getDocs(collection(db, 'tracks'));
-      if (!snap.empty) {
-        const remote: Track[] = [];
-        snap.docs.forEach(d => {
-          const track = { id: d.id, ...d.data() } as Track;
-          remote.push(track);
-        });
-
-        localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(remote));
-        return remote;
-      }
-      return local;
+      // If snap succeeded, remote accurately represents Firestore (even if empty!).
+      // Do NOT fall back to local on an empty collection.
+      const remote: Track[] = snap.docs.map(d => sanitizeTrack({ id: d.id, ...d.data() }));
+      localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(remote));
+      return remote;
     } catch (e) {
-      console.warn('Firestore fetch tracks using local cache', e);
+      console.warn('Firestore fetch tracks failed, using local cache', e);
       return local;
     }
   }
@@ -237,43 +358,73 @@ export class DatabaseService {
    * Save a new track or update existing
    */
   public static async saveTrack(track: Track): Promise<void> {
+    const cleanTrack = sanitizeTrack(track);
     // Invalidate the shared cache so the next read sees the change.
     invalidateTracksCache();
 
     // 1. Instant local persistence
-    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
-    const updated = [track, ...local.filter((t: Track) => t.id !== track.id)];
+    let localRaw: any[] = [];
+    try {
+      localRaw = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
+    } catch {
+      localRaw = [];
+    }
+    const updated = [cleanTrack, ...localRaw.filter((t: Track) => t.id !== cleanTrack.id)];
     localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(updated));
 
     // 2. Background Firestore write with retry & feedback
     if (db) {
-      await withWriteRetry('Saving track', () => setDoc(doc(db!, 'tracks', track.id), stripUndefined(track)));
+      await withWriteRetry('Saving track', () => setDoc(doc(db!, 'tracks', cleanTrack.id), stripUndefined(cleanTrack)));
     }
 
+    _syncBroadcast?.postMessage({ type: 'tracks_changed' });
     notifyTracksChanged();
   }
 
   /**
    * Delete a track
+   * Returns true on successful deletion, false if cancelled or rejected by Firestore security rules.
    */
-  public static async deleteTrack(trackId: string): Promise<void> {
+  public static async deleteTrack(trackId: string): Promise<boolean> {
     // Invalidate the shared cache so the next read sees the deletion.
     invalidateTracksCache();
 
-    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]');
-    const updated = local.filter((t: Track) => t.id !== trackId);
-    localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(updated));
-
-    if (db) {
-      await withWriteRetry('Deleting track', () => deleteDoc(doc(db!, 'tracks', trackId)));
+    let previousLocal: Track[] = [];
+    try {
+      previousLocal = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRACKS) || '[]').map(sanitizeTrack);
+    } catch {
+      previousLocal = [];
     }
 
-    // Remove from playlists
-    const playlists = await this.getPlaylists();
-    for (const pl of playlists) {
-      if (pl.trackIds.includes(trackId)) {
-        await this.removeTrackFromPlaylist(pl.id, trackId);
+    const updated = previousLocal.filter((t: Track) => t.id !== trackId);
+
+    if (db) {
+      const res = await withWriteRetry('Deleting track', () => deleteDoc(doc(db!, 'tracks', trackId)));
+      if (res === null) {
+        // Write failed or rejected by Firestore security rules (e.g. not track owner)
+        // Rollback local cache so the client does not desynchronize from Firestore!
+        localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(previousLocal));
+        invalidateTracksCache();
+        notifyTracksChanged();
+        console.warn(`[deleteTrack] Deletion of track "${trackId}" failed or was rejected by Firestore.`);
+        return false;
       }
+    }
+
+    // Success: persist local deletion
+    localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(updated));
+    _syncBroadcast?.postMessage({ type: 'tracks_changed' });
+
+    // Remove from playlists if owner or collaborator
+    try {
+      const playlists = await this.getPlaylists();
+      for (const pl of playlists) {
+        if (pl.trackIds.includes(trackId)) {
+          await this.removeTrackFromPlaylist(pl.id, trackId);
+        }
+      }
+    } catch {
+      // non-critical
     }
 
     // Remove from user liked / recent lists in local storage
@@ -301,14 +452,16 @@ export class DatabaseService {
     }
 
     notifyTracksChanged();
+    return true;
   }
 
   /**
    * Autonomous Background Auto-Pruner:
-   * Proactively verifies all catalog tracks against Cloudinary and automatically
+   * Proactively verifies catalog tracks against Cloudinary and automatically
    * deletes any orphaned documents whose audio URL returns HTTP 404 / 410.
+   * If currentUserId is passed, only deletes tracks owned by this user to avoid permission errors.
    */
-  public static async autoPruneMissingTracks(): Promise<number> {
+  public static async autoPruneMissingTracks(currentUserId?: string): Promise<number> {
     if (this._isPruning) return 0;
     this._isPruning = true;
 
@@ -316,8 +469,14 @@ export class DatabaseService {
       const tracks = await this.getTracks();
       if (!tracks || tracks.length === 0) return 0;
 
+      const candidates = currentUserId
+        ? tracks.filter(t => t.ownerId === currentUserId)
+        : tracks;
+
+      if (candidates.length === 0) return 0;
+
       const deadTracks: Track[] = [];
-      const queue = [...tracks];
+      const queue = [...candidates];
       const concurrency = Math.min(3, queue.length);
 
       const workers = Array.from({ length: concurrency }, async () => {
@@ -334,7 +493,7 @@ export class DatabaseService {
       await Promise.all(workers);
 
       if (deadTracks.length > 0) {
-        console.log(`[AutoPrune] Detected ${deadTracks.length} deleted Cloudinary track(s). Autonomously purging...`);
+        console.log(`[AutoPrune] Detected ${deadTracks.length} deleted Cloudinary track(s). Purging owned tracks...`);
         for (const dead of deadTracks) {
           await this.deleteTrack(dead.id);
         }
@@ -414,28 +573,26 @@ export class DatabaseService {
   }
 
   /**
-   * Fetch all real playlists (filters out dummy playlists)
+   * Fetch all real playlists
    */
   public static async getPlaylists(): Promise<Playlist[]> {
-    let local: Playlist[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
+    let local: Playlist[] = [];
+    try {
+      local = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
+    } catch {
+      local = [];
+    }
 
     if (!db) return local;
 
     try {
       const snap = await getDocs(collection(db, 'playlists'));
-      if (!snap.empty) {
-        const remote: Playlist[] = [];
-        snap.docs.forEach(d => {
-          const playlist = { id: d.id, ...d.data() } as Playlist;
-          remote.push(playlist);
-        });
-
-        localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(remote));
-        return remote;
-      }
-      return local;
+      // When snap succeeds, remote accurately reflects Firestore (even if empty)
+      const remote: Playlist[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Playlist));
+      localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(remote));
+      return remote;
     } catch (e) {
-      console.warn('Firestore fetch playlists using local cache', e);
+      console.warn('Firestore fetch playlists failed, using local cache', e);
       return local;
     }
   }
@@ -459,19 +616,33 @@ export class DatabaseService {
     if (db) {
       await withWriteRetry('Saving playlist', () => setDoc(doc(db!, 'playlists', playlist.id), stripUndefined(playlist)));
     }
+
+    _syncBroadcast?.postMessage({ type: 'playlists_changed' });
+    notifyTracksChanged();
   }
 
   /**
    * Delete a Playlist
    */
-  public static async deletePlaylist(playlistId: string): Promise<void> {
-    const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
-    const updated = local.filter((p: Playlist) => p.id !== playlistId);
-    localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));
+  public static async deletePlaylist(playlistId: string): Promise<boolean> {
+    const previousLocal = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
+    const updated = previousLocal.filter((p: Playlist) => p.id !== playlistId);
 
     if (db) {
-      await withWriteRetry('Deleting playlist', () => deleteDoc(doc(db!, 'playlists', playlistId)));
+      const res = await withWriteRetry('Deleting playlist', () => deleteDoc(doc(db!, 'playlists', playlistId)));
+      if (res === null) {
+        // Rollback local cache if Firestore write was rejected
+        localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(previousLocal));
+        notifyTracksChanged();
+        console.warn(`[deletePlaylist] Deletion of playlist "${playlistId}" failed or was rejected.`);
+        return false;
+      }
     }
+
+    localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));
+    _syncBroadcast?.postMessage({ type: 'playlists_changed' });
+    notifyTracksChanged();
+    return true;
   }
 
   /**
@@ -623,6 +794,9 @@ export class DatabaseService {
       
       // Save to local storage & Firestore immediately
       await this.saveUserSync(userProfile);
+      invalidateTracksCache();
+      initRealtimeTracksSync();
+      notifyTracksChanged();
       return userProfile;
     } catch (err: any) {
       if (err.message === 'REDIRECT_IN_PROGRESS') {
@@ -655,6 +829,9 @@ export class DatabaseService {
       if (result && result.user) {
         const userProfile = await this.buildProfileFromFirebaseUser(result.user);
         await this.saveUserSync(userProfile);
+        invalidateTracksCache();
+        initRealtimeTracksSync();
+        notifyTracksChanged();
         return userProfile;
       }
     } catch (err: any) {
@@ -729,9 +906,11 @@ export class DatabaseService {
    * Sign out of Firebase Auth
    */
   public static async logout(): Promise<void> {
+    invalidateTracksCache();
     if (auth) {
       await signOut(auth);
     }
+    notifyTracksChanged();
   }
 
   /**

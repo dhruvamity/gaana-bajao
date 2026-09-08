@@ -29,6 +29,19 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     console.error('ErrorBoundary caught:', error, info.componentStack);
   }
 
+  handleClearCacheAndReload = () => {
+    try {
+      localStorage.removeItem('gaana_tracks_cache');
+      localStorage.removeItem('gaana_playlists');
+      localStorage.removeItem('gaana_active_track_id');
+      localStorage.removeItem('gaana_queue');
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn('Failed to clear local storage cache', e);
+    }
+    window.location.href = '/';
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -42,13 +55,21 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               {this.state.error?.message || 'An unexpected error occurred.'}
             </p>
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 rounded-full bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm inline-flex items-center gap-2 transition-colors"
-          >
-            <RefreshCw size={16} />
-            Reload app
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 rounded-full bg-primary hover:bg-primary-fixed text-on-primary font-bold text-sm inline-flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <RefreshCw size={16} />
+              Reload app
+            </button>
+            <button
+              onClick={this.handleClearCacheAndReload}
+              className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm inline-flex items-center gap-2 transition-colors border border-white/10 cursor-pointer"
+            >
+              Reset Cache & Home
+            </button>
+          </div>
         </div>
       );
     }
