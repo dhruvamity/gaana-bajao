@@ -221,6 +221,41 @@ export function sanitizeTrack(raw: any): Track {
 }
 
 /**
+ * Ensures any playlist loaded from Firestore or local cache has guaranteed array trackIds,
+ * string fields, and safe numbers to prevent undefined property crashes.
+ */
+export function sanitizePlaylist(raw: any): Playlist {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: `pl-${Date.now()}`,
+      title: 'Untitled Playlist',
+      description: '',
+      coverUrl: '',
+      trackIds: [],
+      ownerId: '',
+      ownerName: 'User',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : `pl-${Date.now()}`,
+    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'Untitled Playlist',
+    description: typeof raw.description === 'string' ? raw.description : '',
+    coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : '',
+    trackIds: Array.isArray(raw.trackIds) ? raw.trackIds.filter((id: any) => typeof id === 'string') : [],
+    ownerId: typeof raw.ownerId === 'string' ? raw.ownerId : '',
+    ownerName: typeof raw.ownerName === 'string' && raw.ownerName ? raw.ownerName : 'User',
+    collaborators: Array.isArray(raw.collaborators) ? raw.collaborators : undefined,
+    collaboratorIds: Array.isArray(raw.collaboratorIds) ? raw.collaboratorIds : undefined,
+    isAlgorithmic: Boolean(raw.isAlgorithmic),
+    createdAt: typeof raw.createdAt === 'number' && !isNaN(raw.createdAt) ? raw.createdAt : Date.now(),
+    updatedAt: typeof raw.updatedAt === 'number' && !isNaN(raw.updatedAt) ? raw.updatedAt : Date.now()
+  };
+}
+
+/**
  * Cross-tab and real-time catalogue sync.
  */
 const _syncBroadcast = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('gaana_catalogue_sync') : null;
@@ -253,6 +288,7 @@ if (typeof window !== 'undefined') {
 let _tracksCache: Track[] | null = null;
 let _tracksCachePromise: Promise<Track[]> | null = null;
 let _tracksSnapshotUnsubscribe: (() => void) | null = null;
+let _playlistsSnapshotUnsubscribe: (() => void) | null = null;
 
 export type TrackChangeListener = () => void;
 const _trackChangeListeners = new Set<TrackChangeListener>();
@@ -282,32 +318,56 @@ export function invalidateTracksCache(): void {
 }
 
 /**
- * Setup real-time Firestore synchronization for the tracks catalogue.
+ * Setup real-time Firestore synchronization for tracks and playlists catalogue.
  * Automatically pulls updates across all connected browsers when authenticated.
  */
 export function initRealtimeTracksSync(): () => void {
   if (!db) return () => {};
-  if (_tracksSnapshotUnsubscribe) return _tracksSnapshotUnsubscribe;
 
-  try {
-    _tracksSnapshotUnsubscribe = onSnapshot(
-      collection(db, 'tracks'),
-      (snap) => {
-        const remote = snap.docs.map(d => sanitizeTrack({ id: d.id, ...d.data() }));
-        _tracksCache = remote;
-        localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(remote));
-        notifyTracksChanged();
-      },
-      (err) => {
-        // Can happen if unauthenticated or network drops
-        console.warn('Firestore tracks real-time listener inactive:', err.message);
-      }
-    );
-    return _tracksSnapshotUnsubscribe;
-  } catch (e) {
-    console.warn('Could not initialize real-time tracks sync:', e);
-    return () => {};
+  if (!_tracksSnapshotUnsubscribe) {
+    try {
+      _tracksSnapshotUnsubscribe = onSnapshot(
+        collection(db, 'tracks'),
+        (snap) => {
+          const remote = snap.docs.map(d => sanitizeTrack({ id: d.id, ...d.data() }));
+          _tracksCache = remote;
+          localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(remote));
+          notifyTracksChanged();
+        },
+        (err) => {
+          // Can happen if unauthenticated or network drops
+          console.warn('Firestore tracks real-time listener inactive:', err.message);
+        }
+      );
+    } catch (e) {
+      console.warn('Could not initialize real-time tracks sync:', e);
+    }
   }
+
+  if (!_playlistsSnapshotUnsubscribe) {
+    try {
+      _playlistsSnapshotUnsubscribe = onSnapshot(
+        collection(db, 'playlists'),
+        (snap) => {
+          const remote = snap.docs.map(d => sanitizePlaylist({ id: d.id, ...d.data() }));
+          localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(remote));
+          notifyTracksChanged();
+        },
+        (err) => {
+          console.warn('Firestore playlists real-time listener inactive:', err.message);
+        }
+      );
+    } catch (e) {
+      console.warn('Could not initialize real-time playlists sync:', e);
+    }
+  }
+
+  return () => {
+    _tracksSnapshotUnsubscribe?.();
+    _tracksSnapshotUnsubscribe = null;
+    _playlistsSnapshotUnsubscribe?.();
+    _playlistsSnapshotUnsubscribe = null;
+  };
 }
 
 export class DatabaseService {
@@ -580,7 +640,8 @@ export class DatabaseService {
   public static async getPlaylists(): Promise<Playlist[]> {
     let local: Playlist[] = [];
     try {
-      local = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
+      local = Array.isArray(raw) ? raw.map(sanitizePlaylist) : [];
     } catch {
       local = [];
     }
@@ -590,7 +651,7 @@ export class DatabaseService {
     try {
       const snap = await getDocs(collection(db, 'playlists'));
       // When snap succeeds, remote accurately reflects Firestore (even if empty)
-      const remote: Playlist[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Playlist));
+      const remote: Playlist[] = snap.docs.map(d => sanitizePlaylist({ id: d.id, ...d.data() }));
       localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(remote));
       return remote;
     } catch (e) {
@@ -611,12 +672,13 @@ export class DatabaseService {
    * Save or Update a Playlist
    */
   public static async savePlaylist(playlist: Playlist): Promise<void> {
+    const clean = sanitizePlaylist(playlist);
     const local = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYLISTS) || '[]');
-    const updated = [playlist, ...local.filter((p: Playlist) => p.id !== playlist.id)];
+    const updated = [clean, ...local.filter((p: Playlist) => p.id !== clean.id)];
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));
 
     if (db) {
-      await withWriteRetry('Saving playlist', () => setDoc(doc(db!, 'playlists', playlist.id), stripUndefined(playlist)));
+      await withWriteRetry('Saving playlist', () => setDoc(doc(db!, 'playlists', clean.id), stripUndefined(clean)));
     }
 
     _syncBroadcast?.postMessage({ type: 'playlists_changed' });
@@ -648,18 +710,27 @@ export class DatabaseService {
   }
 
   /**
-   * Add a track to an existing playlist
+   * Add a single track to an existing playlist
    */
   public static async addTrackToPlaylist(playlistId: string, trackId: string): Promise<Playlist | null> {
+    return this.addTracksToPlaylist(playlistId, [trackId]);
+  }
+
+  /**
+   * Add multiple tracks to an existing playlist in a single atomic update
+   */
+  public static async addTracksToPlaylist(playlistId: string, trackIds: string[]): Promise<Playlist | null> {
     const playlists = await this.getPlaylists();
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) return null;
 
-    if (playlist.trackIds.includes(trackId)) return playlist;
+    const currentTrackIds = playlist.trackIds || [];
+    const newTrackIds = trackIds.filter(id => !currentTrackIds.includes(id));
+    if (newTrackIds.length === 0) return playlist;
 
     const updatedPlaylist: Playlist = {
       ...playlist,
-      trackIds: [...playlist.trackIds, trackId],
+      trackIds: [...currentTrackIds, ...newTrackIds],
       updatedAt: Date.now()
     };
     await this.savePlaylist(updatedPlaylist);
@@ -674,9 +745,10 @@ export class DatabaseService {
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) return null;
 
+    const currentTrackIds = playlist.trackIds || [];
     const updatedPlaylist: Playlist = {
       ...playlist,
-      trackIds: playlist.trackIds.filter(id => id !== trackId),
+      trackIds: currentTrackIds.filter(id => id !== trackId),
       updatedAt: Date.now()
     };
     await this.savePlaylist(updatedPlaylist);

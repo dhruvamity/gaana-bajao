@@ -154,7 +154,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }, [tracks, activeCategory]);
 
   const playPlaylist = (pl: Playlist) => {
-    const plTracks = tracks.filter(t => pl.trackIds.includes(t.id));
+    const plTracks = tracks.filter(t => (pl.trackIds || []).includes(t.id));
     if (plTracks.length > 0) playTrack(plTracks[0], plTracks);
   };
 
@@ -368,7 +368,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     title={pl.title}
                     artist={pl.ownerName}
                     coverUrl={pl.coverUrl}
-                    subtitle={`${pl.trackIds.length} ${pl.trackIds.length === 1 ? 'track' : 'tracks'} · ${pl.ownerName}`}
+                    subtitle={`${(pl.trackIds || []).length} ${(pl.trackIds || []).length === 1 ? 'track' : 'tracks'} · ${pl.ownerName}`}
                     menuActions={menuActions}
                     onOpen={() => onSelectPlaylist(pl)}
                     onPlay={() => playPlaylist(pl)}

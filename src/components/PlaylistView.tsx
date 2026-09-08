@@ -140,9 +140,17 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   // 4. Load tracks when playlist is ready
   const loadData = async () => {
     if (!currentPlaylist) return;
+    let pl = currentPlaylist;
+    if (pl.id !== 'pl-liked-collection' && pl.id) {
+      const freshPl = await DatabaseService.getPlaylistById(pl.id);
+      if (freshPl) {
+        pl = freshPl;
+        setCurrentPlaylist(freshPl);
+      }
+    }
     const allTracks = await DatabaseService.getTracks();
     setAllCatalogTracks(allTracks);
-    const filtered = currentPlaylist.trackIds
+    const filtered = (pl.trackIds || [])
       .map(id => allTracks.find(t => t.id === id))
       .filter((t): t is Track => Boolean(t));
     setTracks(filtered);
@@ -274,7 +282,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   });
 
   const availableToAdd = allCatalogTracks.filter(t => 
-    !currentPlaylist.trackIds.includes(t.id) &&
+    !(currentPlaylist.trackIds || []).includes(t.id) &&
     (t.title.toLowerCase().includes(trackSearchQuery.toLowerCase()) || 
      t.artist.toLowerCase().includes(trackSearchQuery.toLowerCase()))
   );

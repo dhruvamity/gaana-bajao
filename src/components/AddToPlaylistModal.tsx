@@ -35,7 +35,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
         setPlaylists(allPlaylists);
         setCatalogue(allTracks);
         const containing = allPlaylists
-          .filter(p => p.trackIds.includes(track.id))
+          .filter(p => (p.trackIds || []).includes(track.id))
           .map(p => p.id);
         setAddedPlaylistIds(containing);
         setLoading(false);
@@ -133,7 +133,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                       <div className="text-left min-w-0">
                         <h4 className="text-xs font-bold text-white truncate">{playlist.title}</h4>
                         <p className="text-[10px] text-on-surface-variant truncate">
-                          {playlist.trackIds.length} tracks • {playlist.ownerName}
+                          {(playlist.trackIds || []).length} tracks • {playlist.ownerName}
                         </p>
                       </div>
                     </div>

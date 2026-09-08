@@ -549,6 +549,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           audioEngineRef.current?.play().catch(() => {});
           setIsPlaying(true);
           playStartTimeRef.current = Date.now();
+        } else if (cmd.trackId) {
+          const catalog = await DatabaseService.getTracks();
+          const targetTrack = catalog.find(t => t.id === cmd.trackId);
+          if (targetTrack) {
+            startTrack(targetTrack, undefined, { userInitiated: false });
+            playStartTimeRef.current = Date.now();
+          }
         }
         break;
       }

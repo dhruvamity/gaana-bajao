@@ -90,7 +90,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
 
   const handleQuickPlay = (e: React.MouseEvent, playlist: Playlist) => {
     e.stopPropagation();
-    const playlistTracks = playlist.trackIds
+    const playlistTracks = (playlist.trackIds || [])
       .map(id => allTracks.find(t => t.id === id))
       .filter((t): t is Track => Boolean(t));
 
@@ -337,7 +337,7 @@ export const PlaylistsDirectoryView: React.FC<PlaylistsDirectoryViewProps> = ({
                         ))}
                       </div>
                     )}
-                    <span>{playlist.trackIds.length} tracks</span>
+                    <span>{(playlist.trackIds || []).length} tracks</span>
                   </div>
                 </div>
               </div>

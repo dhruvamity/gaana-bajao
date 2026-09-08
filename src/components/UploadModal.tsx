@@ -318,9 +318,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       const uploadedTrackIds = uploadedTracks.map(t => t.id);
 
       if (playlistMode === 'existing' && selectedPlaylistId) {
-        for (const trackId of uploadedTrackIds) {
-          await DatabaseService.addTrackToPlaylist(selectedPlaylistId, trackId);
-        }
+        await DatabaseService.addTracksToPlaylist(selectedPlaylistId, uploadedTrackIds);
       } else if (playlistMode === 'new' && newPlaylistTitle.trim()) {
         // Use the first track's cover as playlist cover
         const playlistCover = globalCoverUrl || uploadedTracks[0]?.coverUrl || '';
