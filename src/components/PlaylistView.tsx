@@ -166,6 +166,17 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   }, [currentPlaylist]);
 
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
+
   const handleBack = () => {
     if (onBack) onBack();
     else navigate(-1);
@@ -236,17 +247,6 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     (currentUser && currentPlaylist.ownerId === currentUser.id) ||
     currentPlaylist.collaborators?.some(c => c.id === currentUser?.id)
   );
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMenuOpen]);
 
   const handleRemoveTrack = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
