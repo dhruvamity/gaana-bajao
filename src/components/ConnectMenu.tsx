@@ -18,6 +18,7 @@ import {
   ArrowRightLeft
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import { DeviceSession, DeviceType } from '../types';
 import { ConnectSyncService } from '../services/connectSync';
 
@@ -36,8 +37,9 @@ export const ConnectMenu: React.FC = () => {
     takeOverPlaybackHere
   } = useAudio();
 
+  const { currentUser } = useAuth();
   const [listenTogether, setListenTogether] = useState<boolean>(false);
-  const currentDeviceId = ConnectSyncService.getOrCreateDeviceId();
+  const currentDeviceId = ConnectSyncService.getDeviceId(currentUser?.id);
   const currentDeviceName = ConnectSyncService.getDeviceName();
   const currentDeviceType = ConnectSyncService.getDeviceType();
 

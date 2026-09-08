@@ -1046,8 +1046,12 @@ export class DatabaseService {
     events.unshift(event);
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events.slice(0, 500)));
 
-    if (db) {
-      await withWriteRetry('Telemetry log', () => setDoc(doc(db!, 'telemetry', event.id), stripUndefined(event)));
+    if (db && auth?.currentUser && auth.currentUser.uid === event.userId) {
+      try {
+        await setDoc(doc(db, 'telemetry', event.id), stripUndefined(event));
+      } catch (err) {
+        console.warn('[Telemetry] Log write skipped/failed:', err);
+      }
     }
   }
 
@@ -1143,7 +1147,7 @@ export class DatabaseService {
     const updated = [session, ...sessions.filter(s => s.id !== session.id)];
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
 
-    // Broadcast across local tabs immediately
+    // Broadcast across local tabs immediately (< 5ms)
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         const bc = new BroadcastChannel('gaana_device_presence');
@@ -1152,10 +1156,17 @@ export class DatabaseService {
       }
     } catch {}
 
-    if (db) {
-      await withWriteRetry('Device session update', () =>
-        setDoc(doc(db!, 'device_sessions', session.id), stripUndefined(session), { merge: true })
-      );
+    // Only attempt Firestore write if Firebase Auth is signed in AND matches session.userId.
+    // This prevents PERMISSION_DENIED on initial startup or when unauthenticated.
+    if (!db || !auth?.currentUser || auth.currentUser.uid !== session.userId) {
+      return;
+    }
+
+    try {
+      await setDoc(doc(db, 'device_sessions', session.id), stripUndefined(session), { merge: true });
+    } catch (err: any) {
+      // Background presence heartbeat logs to console without triggering intrusive toast popups
+      console.warn('[DeviceSession] Firestore session sync failed/skipped:', err?.message || err);
     }
   }
 
@@ -1178,11 +1189,11 @@ export class DatabaseService {
       }
     } catch {}
 
-    if (db && deviceId) {
+    if (db && deviceId && auth?.currentUser) {
       try {
         await deleteDoc(doc(db, 'device_sessions', deviceId));
-      } catch (err) {
-        console.warn('Failed to delete device session:', err);
+      } catch (err: any) {
+        console.warn('[DeviceSession] Failed to delete device session:', err?.message || err);
       }
     }
   }
@@ -1201,17 +1212,26 @@ export class DatabaseService {
     } catch {}
 
     // 2. Persist to Firestore so remote browsers / devices receive it in real-time
-    if (db && targetDeviceId) {
-      await withWriteRetry('Send device command', () =>
-        setDoc(
-          doc(db!, 'device_sessions', targetDeviceId),
-          {
-            pendingCommand: stripUndefined(command),
-            lastUpdated: Date.now()
-          },
-          { merge: true }
-        )
-      );
+    if (db && targetDeviceId && auth?.currentUser) {
+      try {
+        await updateDoc(doc(db, 'device_sessions', targetDeviceId), {
+          pendingCommand: stripUndefined(command),
+          lastUpdated: Date.now()
+        });
+      } catch {
+        try {
+          await setDoc(
+            doc(db, 'device_sessions', targetDeviceId),
+            {
+              pendingCommand: stripUndefined(command),
+              lastUpdated: Date.now()
+            },
+            { merge: true }
+          );
+        } catch (e: any) {
+          console.warn('[DeviceCommand] Remote command delivery skipped/failed:', e?.message || e);
+        }
+      }
     }
   }
 

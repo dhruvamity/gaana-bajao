@@ -249,7 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setIsLoading(true);
     try {
-      await ConnectSyncService.unregisterCurrentDevice();
+      await ConnectSyncService.unregisterCurrentDevice(currentUser?.id);
     } catch {}
     try {
       await DatabaseService.logout();

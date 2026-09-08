@@ -248,6 +248,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   userIdRef.current = currentUser?.id;
 
   const broadcastNow = useCallback(() => {
+    if (!userIdRef.current) return;
     ConnectSyncService.broadcastState({
       userId: userIdRef.current,
       isPlaying,
@@ -517,7 +518,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const currentDeviceId = ConnectSyncService.getOrCreateDeviceId();
+  const currentDeviceId = ConnectSyncService.getDeviceId(currentUser?.id);
 
   const executeRemoteCommand = useCallback(async (cmd: RemoteCommand) => {
     switch (cmd.type) {
@@ -629,7 +630,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         lastProcessedCommandRef.current = cmd.issuedAt;
         await executeRemoteCommand(cmd);
       }
-    });
+    }, currentUser.id);
 
     return () => {
       unsubSessions();

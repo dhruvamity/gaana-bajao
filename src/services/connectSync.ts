@@ -1,22 +1,37 @@
 import { DeviceSession, DeviceType, RemoteCommand } from '../types';
 import { DatabaseService } from './firebase';
 
-const DEVICE_ID_KEY = 'gaana_device_id';
+const MACHINE_ID_KEY = 'gaana_machine_id';
 
 export class ConnectSyncService {
-  private static deviceId: string = ConnectSyncService.getOrCreateDeviceId();
-
-  public static getOrCreateDeviceId(): string {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
+  /**
+   * Generates or retrieves a persistent machine ID for this browser instance.
+   */
+  public static getOrCreateMachineId(): string {
+    let id = localStorage.getItem(MACHINE_ID_KEY);
     if (!id) {
-      id = 'dev_' + Math.random().toString(36).substring(2, 9);
-      localStorage.setItem(DEVICE_ID_KEY, id);
+      id = 'm_' + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem(MACHINE_ID_KEY, id);
     }
     return id;
   }
 
-  public static getDeviceId(): string {
-    return this.deviceId;
+  /**
+   * Scopes device ID to the authenticated user ID.
+   * This guarantees that documents in Firestore device_sessions collection are strictly
+   * owned by the current user (uid) and prevents PERMISSION_DENIED collisions across accounts.
+   */
+  public static getDeviceId(userId?: string | null): string {
+    const machineId = this.getOrCreateMachineId();
+    if (userId) {
+      return `${userId}_${machineId}`;
+    }
+    return `dev_${machineId}`;
+  }
+
+  /** Backwards-compatible alias */
+  public static getOrCreateDeviceId(userId?: string | null): string {
+    return this.getDeviceId(userId);
   }
 
   public static getDeviceType(): DeviceType {
@@ -59,7 +74,7 @@ export class ConnectSyncService {
   }
 
   /**
-   * Broadcast current device state.
+   * Broadcast current device state with strict type sanitization matching firestore.rules validSession.
    */
   public static async broadcastState(state: {
     userId?: string | null;
@@ -71,17 +86,29 @@ export class ConnectSyncService {
   }): Promise<void> {
     if (!state.userId) return;
 
+    const deviceId = this.getDeviceId(state.userId);
+
+    const safeProgress = typeof state.progressSeconds === 'number' && !isNaN(state.progressSeconds) && isFinite(state.progressSeconds)
+      ? Math.max(0, Math.round(state.progressSeconds))
+      : 0;
+
+    const safeVolume = typeof state.volume === 'number' && !isNaN(state.volume) && isFinite(state.volume)
+      ? Math.max(0, Math.min(1, Number(state.volume.toFixed(2))))
+      : 0.85;
+
+    const deviceName = (this.getDeviceName() || 'Web Player').substring(0, 200);
+
     const session: DeviceSession = {
-      id: this.deviceId,
+      id: deviceId,
       userId: state.userId,
-      name: this.getDeviceName(),
+      name: deviceName,
       deviceType: this.getDeviceType(),
       isCurrentDevice: true,
-      isActivePlayback: state.isActivePlayback,
+      isActivePlayback: Boolean(state.isActivePlayback),
       currentTrackId: state.currentTrackId ?? '',
-      progressSeconds: state.progressSeconds,
-      isPlaying: state.isPlaying,
-      volume: state.volume,
+      progressSeconds: safeProgress,
+      isPlaying: Boolean(state.isPlaying),
+      volume: safeVolume,
       lastUpdated: Date.now()
     };
 
@@ -98,18 +125,20 @@ export class ConnectSyncService {
   /**
    * Unregister current device session (e.g. on logout or before unload)
    */
-  public static async unregisterCurrentDevice(): Promise<void> {
-    await DatabaseService.deleteDeviceSession(this.deviceId);
+  public static async unregisterCurrentDevice(userId?: string | null): Promise<void> {
+    const deviceId = this.getDeviceId(userId);
+    await DatabaseService.deleteDeviceSession(deviceId);
   }
 
   /**
    * Listen for local cross-tab remote commands
    */
-  public static onRemoteCommand(callback: (command: RemoteCommand) => void): () => void {
+  public static onRemoteCommand(callback: (command: RemoteCommand) => void, userId?: string | null): () => void {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return () => {};
     const bc = new BroadcastChannel('gaana_device_command');
     bc.onmessage = (event) => {
-      if (event.data?.targetDeviceId === this.deviceId && event.data?.command) {
+      const myId = this.getDeviceId(userId);
+      if (event.data?.targetDeviceId === myId && event.data?.command) {
         callback(event.data.command);
       }
     };
